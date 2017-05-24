@@ -1,4 +1,4 @@
-#CONTIKI_PROJECT=accel_node
+CONTIKI_PROJECT=accel_node
 all: $(CONTIKI_PROJECT)
 
 
