@@ -91,31 +91,40 @@ function setupSensors() {
             }
 
             (function($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor) {
-                setInterval(function() {
-                    var rx = Math.floor((Math.random() * 2) * 10000) / 10000;
-                    var ry = Math.floor((Math.random() * 2) * 10000) / 10000;
-                    var rz = Math.floor((Math.random() * 2) * 10000) / 10000;
+                function getSensorData() {
+                    $.get({
+                        url: "/data/sensor/" + sensor,
+                        dataType: "json"
+                    }).done(function(data) {
+                        var rx = data.x;
+                        var ry = data.y;
+                        var rz = data.z;
 
-                    x.append(new Date().getTime(), rx);
-                    y.append(new Date().getTime(), ry);
-                    z.append(new Date().getTime(), rz);
+                        x.append(new Date().getTime(), rx);
+                        y.append(new Date().getTime(), ry);
+                        z.append(new Date().getTime(), rz);
 
-                    if (x.length > 50) {
-                        x.shift();
-                    }
-                    if (y.length > 50) {
-                        y.shift();
-                    }
-                    if (z.length > 50) {
-                        z.shift();
-                    }
+                        if (x.length > 50) {
+                            x.shift();
+                        }
+                        if (y.length > 50) {
+                            y.shift();
+                        }
+                        if (z.length > 50) {
+                            z.shift();
+                        }
 
-                    $dataX.html(rx);
-                    $dataY.html(ry);
-                    $dataZ.html(rz);
+                        $dataX.html(rx);
+                        $dataY.html(ry);
+                        $dataZ.html(rz);
 
-                    updateVectorGraph(vectorElement, rx, ry, rz, sensor);
-                }, 750);
+                        updateVectorGraph(vectorElement, rx, ry, rz, sensor);
+                    })
+
+                    setTimeout(getSensorData, 1000);
+                }
+
+                getSensorData();
             })($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor);
             
             var chart = new SmoothieChart();

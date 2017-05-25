@@ -30,6 +30,13 @@ def driver():
 def sensor_count():
     return '{"count": "' + str(6) + '"}'
 
+@app.route("/data/sensor/<sensor>")
+def sensor_data(sensor):
+    x = random.randint(0, 20000) / 10000.0 
+    y = random.randint(0, 20000) / 10000.0
+    z = random.randint(0, 20000) / 10000.0
+    return '{"x": "' + str(x) + '", "y": "' + str(y) + '", "z": "' + str(z) + '"}'
+
     
 if __name__ == "__main__":
     app.run(host='0.0.0.0')
