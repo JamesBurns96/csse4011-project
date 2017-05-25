@@ -16,12 +16,64 @@ var cameraPositions = [
     }
 ];
 
+var sensors = {};
 var vectorGraphs = [];
 
 $(document).ready(function() {
     setupSensors();
     setupPrediction();
+    setupDeviceGyro();
 })
+
+/**
+ * DEVICE SENSORS
+ */
+
+function setupDeviceGyro() {
+    if (window.DeviceOrientationEvent) {
+        window.addEventListener("deviceorientation", function () {
+            tilt(event.beta, event.gamma, event.alpha);
+        }, true);
+    } else if (window.DeviceMotionEvent) {
+        window.addEventListener('devicemotion', function () {
+            tilt(event.acceleration.x * 2, event.acceleration.y * 2, event.acceleration.z * 2);
+        }, true);
+    } else {
+        window.addEventListener("MozOrientation", function () {
+            tilt(orientation.x * 50, orientation.y * 50, orientation.z * 50);
+        }, true);
+    }
+
+    function tilt(rx, ry, rz) {
+        var data = sensors["device_gyro"];
+
+        data.x.append(new Date().getTime(), rx);
+        data.y.append(new Date().getTime(), ry);
+        data.z.append(new Date().getTime(), rz);
+
+        if (data.x.length > 50) {
+            data.x.shift();
+        }
+        if (data.y.length > 50) {
+            data.y.shift();
+        }
+        if (data.z.length > 50) {
+            data.z.shift();
+        }
+
+        data.dataX.html(rx);
+        data.dataY.html(ry);
+        data.dataZ.html(rz);
+
+        updateVectorGraph(data.vectorElement, data.rx, data.ry, data.rz, "device_gyro");
+
+        $.get({
+            url: "/data/device/gyro/" + rx + "/" + ry + "/" + rz
+        }).done(function(data) {
+            // Do nothing
+        })
+    }
+}
 
 /**
  * PREDICTION FUNCTIONS
@@ -36,7 +88,6 @@ function setupPrediction() {
             url: "/data/driver",
             dataType: "json"
         }).done(function(data) {
-            console.log(data);
             $driverName.html(data.name);
             $driverConfidence.html(data.confidence + "%")
         })
@@ -59,81 +110,110 @@ function setupSensors() {
     }).done(function(data) {
         for (var sensor = 1; sensor <= data.count; sensor++) {
             if (sensor > 1) {
-                $new = $("#sensor-1").clone()
-
-                $new.attr("id", "sensor-" + sensor);
-                $new.find(".sensor-name").first().html("Sensor " + sensor);
-                $new.find(".show-hide-toggle").first().attr("data-target", "#sensor-" + sensor + "-collapse");
-                $new.find(".collapse").first().attr("id", "sensor-" + sensor + "-collapse");
-                
-                $new.appendTo($("#sensor-1").parent());
+                createNewSensor(sensor);
             }
 
-            $sensor = $("#sensor-" + sensor);
+            configureSensor(sensor);
+        }
 
-            $dataX = $sensor.find(".data-x").first();
-            $dataY = $sensor.find(".data-y").first();
-            $dataZ = $sensor.find(".data-z").first();
+        createNewSensor("device_gyro");
+        configureSensor("device_gyro");
+    })
+}
 
-            chartElement = $sensor.find(".chart").first().get(0);
-            chartElement.setAttribute("width", $(chartElement.parentNode).width());
+function createNewSensor(sensor) {
+    $new = $("#sensor-1").clone()
 
-            vectorElement = $sensor.find(".vector").first().get(0);
+    $new.attr("id", "sensor-" + sensor);
+    $new.find(".sensor-name").first().html("Sensor " + sensor);
+    $new.find(".show-hide-toggle").first().attr("data-target", "#sensor-" + sensor + "-collapse");
+    $new.find(".collapse").first().attr("id", "sensor-" + sensor + "-collapse");
+    
+    $new.appendTo($("#sensor-1").parent());
+}
 
-            var x = new TimeSeries();
-            var y = new TimeSeries();
-            var z = new TimeSeries();
+function configureSensor(sensor) {
+    $sensor = $("#sensor-" + sensor);
 
-            createVectorGraph(vectorElement, 1, 0, 0, sensor);
+    $dataX = $sensor.find(".data-x").first();
+    $dataY = $sensor.find(".data-y").first();
+    $dataZ = $sensor.find(".data-z").first();
 
-            if ($(window).width() > 992) {
-                chartElement.setAttribute("height", $(chartElement.parentNode).height());
-            }
+    chartElement = $sensor.find(".chart").first().get(0);
+    chartElement.setAttribute("width", $(chartElement.parentNode).width());
 
-            (function($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor) {
-                function getSensorData() {
-                    $.get({
-                        url: "/data/sensor/" + sensor,
-                        dataType: "json"
-                    }).done(function(data) {
-                        var rx = data.x;
-                        var ry = data.y;
-                        var rz = data.z;
+    vectorElement = $sensor.find(".vector").first().get(0);
 
-                        x.append(new Date().getTime(), rx);
-                        y.append(new Date().getTime(), ry);
-                        z.append(new Date().getTime(), rz);
+    var x = new TimeSeries();
+    var y = new TimeSeries();
+    var z = new TimeSeries();
 
-                        if (x.length > 50) {
-                            x.shift();
-                        }
-                        if (y.length > 50) {
-                            y.shift();
-                        }
-                        if (z.length > 50) {
-                            z.shift();
-                        }
+    createVectorGraph(vectorElement, 1, 0, 0, sensor);
 
-                        $dataX.html(rx);
-                        $dataY.html(ry);
-                        $dataZ.html(rz);
+    if ($(window).width() > 992) {
+        chartElement.setAttribute("height", $(chartElement.parentNode).height());
+    }
 
-                        updateVectorGraph(vectorElement, rx, ry, rz, sensor);
-                    })
+    var chart = new SmoothieChart();
+    chart.addTimeSeries(x, { strokeStyle: 'rgba(0, 255, 0, 1)', fillStyle: 'rgba(0, 255, 0, 0.2)', lineWidth: 3 });
+    chart.addTimeSeries(y, { strokeStyle: 'rgba(255, 0, 0, 1)', fillStyle: 'rgba(255, 0, 0, 0.2)', lineWidth: 3 });
+    chart.addTimeSeries(z, { strokeStyle: 'rgba(0, 0, 255, 1)', fillStyle: 'rgba(0, 0, 255, 0.2)', lineWidth: 3 });
+    chart.streamTo(chartElement, 500);
 
-                    setTimeout(getSensorData, 1000);
+    sensors[sensor] = {
+        sensor: $sensor,
+        dataX: $dataX,
+        dataY: $dataY,
+        dataZ: $dataZ,
+        x: x,
+        y: y,
+        z: z,
+        chart: chart,
+        chartElement: chartElement,
+        vectorElement: vectorElement    
+    };
+
+    if (sensor == "device_gyro") {
+        // Don't use get requests for the device data
+        return;
+    }
+
+    (function($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor) {
+        function getSensorData() {
+            $.get({
+                url: "/data/sensor/" + sensor,
+                dataType: "json"
+            }).done(function(data) {
+                var rx = data.x;
+                var ry = data.y;
+                var rz = data.z;
+
+                x.append(new Date().getTime(), rx);
+                y.append(new Date().getTime(), ry);
+                z.append(new Date().getTime(), rz);
+
+                if (x.length > 50) {
+                    x.shift();
+                }
+                if (y.length > 50) {
+                    y.shift();
+                }
+                if (z.length > 50) {
+                    z.shift();
                 }
 
-                getSensorData();
-            })($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor);
-            
-            var chart = new SmoothieChart();
-            chart.addTimeSeries(x, { strokeStyle: 'rgba(0, 255, 0, 1)', fillStyle: 'rgba(0, 255, 0, 0.2)', lineWidth: 3 });
-            chart.addTimeSeries(y, { strokeStyle: 'rgba(255, 0, 0, 1)', fillStyle: 'rgba(255, 0, 0, 0.2)', lineWidth: 3 });
-            chart.addTimeSeries(z, { strokeStyle: 'rgba(0, 0, 255, 1)', fillStyle: 'rgba(0, 0, 255, 0.2)', lineWidth: 3 });
-            chart.streamTo(chartElement, 500);
+                $dataX.html(rx);
+                $dataY.html(ry);
+                $dataZ.html(rz);
+
+                updateVectorGraph(vectorElement, rx, ry, rz, sensor);
+            })
+
+            setTimeout(getSensorData, 1000);
         }
-    })
+
+        getSensorData();
+    })($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor);
 }
 
 function createVectorGraph(vectorElement, v1, v2, v3, sensor) {
