@@ -1,0 +1,65 @@
+<!doctype HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>CSSE4011 - Group H</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+    <style>
+        .sensor-graph {
+            padding: 5px;
+            margin: 2px;
+        }
+        .data-x, .data-y, .data-z {
+            margin-left: 5px;
+        }
+        .margin-top {
+            margin-top: 5px;
+        }
+        .show-hide-toggle {
+            font-size: 0.75rem;
+            line-height: 2rem;
+        }
+        .collapse.show {
+            display: inherit !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CSSE4011 - Group H</h1>
+        <h5>Burns, Clark, Conley, Garrone</h5>
+        <p class="lead">An attempt to provide driver identification via a 6LowPan CC2650 sensor tag network, unterfaced with a python machine learning module and served via a beautiful webapp.</p>
+
+        <div class="row sensor-graph card" id="sensor-1">
+            <div class="col-12">
+                <h3 class="d-inline sensor-name">Sensor 1</h3>
+                <a class="show-hide-toggle float-right" data-toggle="collapse" data-target="#sensor-1-collapse" aria-expanded="true">Show/Hide</a>
+            </div>
+            <div class="collapse show row" id="sensor-1-collapse">
+                <div class="col-sm-12 col-lg-2">
+                    <div class="vector"></div>
+                </div>
+                <div class="col-sm-12 col-lg-2 row">
+                    <div class="col-4 col-lg-12 text-center">X:<span class="data-x"></span></div>
+                    <div class="col-4 col-lg-12 text-center">Y:<span class="data-y"></span></div>
+                    <div class="col-4 col-lg-12 text-center">Z:<span class="data-z"></span></div>
+                </div>
+                <div class="col-sm-12 col-lg-8 text-center">
+                    <canvas class="chart" height="100">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.rawgit.com/joewalnes/smoothie/master/smoothie.js" type="text/javascript"></script>
+    <script src="third-party/vis.custom.js" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.js"></script>
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+    <script src="js/main.js" type="text/javascript"></script>
+</body>
+</html>
