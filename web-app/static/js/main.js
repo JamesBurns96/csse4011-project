@@ -45,6 +45,10 @@ function setupDeviceGyro() {
     }
 
     function tilt(rx, ry, rz) {
+        rx = Math.floor(rx * 1000) / 1000;
+        ry = Math.floor(ry * 1000) / 1000;
+        rz = Math.floor(rz * 1000) / 1000;
+
         var data = sensors["device_gyro"];
 
         data.x.append(new Date().getTime(), rx);
@@ -154,7 +158,12 @@ function configureSensor(sensor) {
         chartElement.setAttribute("height", $(chartElement.parentNode).height());
     }
 
-    var chart = new SmoothieChart();
+    var chart = new SmoothieChart({minValue: -2, maxValue: 2});
+
+    if (sensor == "device_gyro") {
+        chart = new SmoothieChart({minValue: -180, maxValue: 180});
+    }
+
     chart.addTimeSeries(x, { strokeStyle: 'rgba(0, 255, 0, 1)', fillStyle: 'rgba(0, 255, 0, 0.2)', lineWidth: 3 });
     chart.addTimeSeries(y, { strokeStyle: 'rgba(255, 0, 0, 1)', fillStyle: 'rgba(255, 0, 0, 0.2)', lineWidth: 3 });
     chart.addTimeSeries(z, { strokeStyle: 'rgba(0, 0, 255, 1)', fillStyle: 'rgba(0, 0, 255, 0.2)', lineWidth: 3 });
