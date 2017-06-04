@@ -35,17 +35,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ACCEL_SAMPLES_PER_SECOND 10
-#define ACCEL_SAMPLE_PERIOD (CLOCK_SECOND/ACCEL_SAMPLES_PER_SECOND)
+#define ACCEL_SAMPLES_PER_SECOND 20
+#define ACCEL_SAMPLE_PERIOD ((1.0*CLOCK_SECOND)/(1.0*ACCEL_SAMPLES_PER_SECOND))
 
 #define START_BYTE '('
 #define STOP_BYTE ')'
 
 #define TCP_PORT 42069
 #define UDP_CLIENT_PORT 42070
-#define UDP_SERVER_PORT 42070
+#define UDP_SERVER_PORT 42071
 
-#define HEARTBEAT_PERIOD (2 * CLOCK_SECOND)
+#define HEARTBEAT_PERIOD 1 * CLOCK_SECOND
 
 //#define BORDER_ROUTER_IP6_ADDR_CHOSEN
 #ifndef BORDER_ROUTER_IP6_ADDR_CHOSEN
@@ -55,12 +55,22 @@
 #define TAG_ID 0
 
 
+
+/*-COMPILATION_CONFIG_OPTIONS------------------------------------------------*/
+// Toggles which processes are enabled
+#define ACCEL_ENABLED                       1
+#define TCP_ENABLED                         1
+#define UDP_ENABLED                         1
+
+// Toggles whether using etimer or ctimer
+#define ETIMER                              1
+// Toggles if using James' ghetto driver mods
+#define ACCELEROMETER_DRIVERS_MODIFIED      0
 /*---------------------------------------------------------------------------*/
-#define ACCEL_ENABLED
-#define TCP_ENABLED
-#define UDP_ENABLED
-/*---------------------------------------------------------------------------*/
-static struct etimer heartbeat, tcp_et;
+static struct etimer heartbeat;
+#if ETIMER
+static struct etimer tcp_et, accel_et;
+#endif
 
 static uip_ipaddr_t addr;
 
@@ -68,6 +78,7 @@ static struct uip_udp_conn *server_conn;
 
 static uint16_t timeStamp = 0;
 static uint8_t payloadIndex = 0;
+static uint8_t count = 0;
 clock_time_t next = ACCEL_SAMPLE_PERIOD;
 /*---------------------------------------------------------------------------*/
 PROCESS(accelerometer_process, "accelerometer process");
@@ -78,12 +89,12 @@ AUTOSTART_PROCESSES(&accelerometer_process);
 /*---------------------------------------------------------------------------*/
 #pragma pack(1)
 typedef struct AccelData {
-    uint8_t xAcc;
-    uint8_t yAcc;
-    uint8_t zAcc;
-    uint8_t xGyro;
-    uint8_t yGyro;
-    uint8_t zGyro;
+    int16_t xAcc;
+    int16_t yAcc;
+    int16_t zAcc;
+    int16_t xGyro;
+    int16_t yGyro;
+    int16_t zGyro;
 }AccelData;
 /*---------------------------------------------------------------------------*/
 #pragma pack(1)
@@ -96,8 +107,11 @@ typedef struct Payload {
 } Payload;
 
 Payload tcpPayload;
+#pragma message("May want to consider having a queue of payloads")
 /*---------------------------------------------------------------------------*/
+#if ETIMER == 0
 static struct ctimer mpu_timer;		//Callback timer
+#endif
 /*---------------------------------------------------------------------------*/
 static void init_mpu_reading(void *not_used);
 /*---------------------------------------------------------------------------*/
@@ -143,8 +157,10 @@ payload_print(void)
 {
     printf("xAcc: %d, yAcc: %d, zAcc: %d, xGyro: %d, yGyro: %d, zGyro: %d\n\r",
         tcpPayload.data[payloadIndex].xAcc, tcpPayload.data[payloadIndex].yAcc,
-        tcpPayload.data[payloadIndex].zAcc, tcpPayload.data[payloadIndex].xGyro,
-        tcpPayload.data[payloadIndex].yGyro, tcpPayload.data[payloadIndex].zGyro);
+        tcpPayload.data[payloadIndex].zAcc,
+        (int)((1.0 * tcpPayload.data[payloadIndex].xGyro) / (65536/500)),
+        (int)((1.0 * tcpPayload.data[payloadIndex].yGyro) / (65546/500)),
+        (int)((1.0 * tcpPayload.data[payloadIndex].zGyro) / (65536/500)));
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -162,26 +178,48 @@ static void
 get_mpu_reading()
 {
 
-    // Get all sensor data from accelerometer
+#if ACCEL_DRIVERS_MODIFIED
+
+    // Get all sensor data from accelerometer    
     tcpPayload.data[payloadIndex].xGyro
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X);
     tcpPayload.data[payloadIndex].yGyro
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y);
     tcpPayload.data[payloadIndex].zGyro
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z);
     tcpPayload.data[payloadIndex].xAcc
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X);
     tcpPayload.data[payloadIndex].yAcc
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y);
     tcpPayload.data[payloadIndex].zAcc
-            = (uint8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
+            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
 
+#else
+
+    uint16_t *accRead;
+    
+    accRead= (uint16_t *)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO);
+
+    tcpPayload.data[payloadIndex].xGyro = accRead[0];
+    tcpPayload.data[payloadIndex].yGyro = accRead[1];
+    tcpPayload.data[payloadIndex].zGyro = accRead[2];
+
+    accRead= (uint16_t *)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC);
+    
+    tcpPayload.data[payloadIndex].xAcc = accRead[0];
+    tcpPayload.data[payloadIndex].yAcc = accRead[1];
+    tcpPayload.data[payloadIndex].zAcc = accRead[2];
+#endif
+
+#if ETIMER == 0
     SENSORS_DEACTIVATE(mpu_9250_sensor);
-
-    // increase payload index 
-    payloadIndex = ++payloadIndex % ACCEL_SAMPLES_PER_SECOND;
-
     ctimer_set(&mpu_timer, next, init_mpu_reading, NULL);
+#endif
+    // increase payload index 
+    payloadIndex = ((payloadIndex + 1) % ACCEL_SAMPLES_PER_SECOND);
+
+    ++count;
+
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -190,13 +228,15 @@ init_mpu_reading(void *not_used)
   mpu_9250_sensor.configure(SENSORS_ACTIVE, MPU_9250_SENSOR_TYPE_ALL);
 }
 /*---------------------------------------------------------------------------*/
-#ifdef ACCEL_ENABLED
+#if ACCEL_ENABLED
+#pragma message("Accelerometer task compilation enabled")
 PROCESS_THREAD(accelerometer_process, ev, data)
 {
 	
   	PROCESS_BEGIN();
 
   	etimer_set(&heartbeat, HEARTBEAT_PERIOD);	//Set event timer for 20s interval.
+  	etimer_set(&accel_et, ACCEL_SAMPLE_PERIOD);	//Set event timer for 20s interval.
     init_mpu_reading(NULL);
     tcp_payload_init();
   	
@@ -210,18 +250,27 @@ PROCESS_THREAD(accelerometer_process, ev, data)
 
 			if(data == &heartbeat) {
 				leds_toggle(LEDS_RED);
+//                printf("Count: %d\n\r", count);
+//                count = 0;
 				etimer_reset(&heartbeat);		//Reset event timer
-			}
+			} else if(data == &accel_et) {
+
+                get_mpu_reading();
+                payload_print();
+                
+				etimer_reset(&accel_et);		//Reset event timer
+
+            }
 
 		//Check for sensor event
 		} else if(ev == sensors_event) {
 
 			//Check for Humidity reading
-		  	if(ev == sensors_event && data == &hdc_1000_sensor) {
+		  	if(ev == sensors_event && data == &mpu_9250_sensor) {
 
-                get_mpu_reading();
+//                get_mpu_reading();
 
-                payload_print();
+//                payload_print();
 
 			}
 		}
@@ -231,7 +280,8 @@ PROCESS_THREAD(accelerometer_process, ev, data)
 }
 #endif
 /*---------------------------------------------------------------------------*/
-#ifdef TCP_ENABLED
+#if TCP_ENABLED
+#pragma message("TCP task compilation enabled")
 PROCESS_THREAD(tcp_client_process, ev, data)
 {
 
@@ -280,7 +330,8 @@ PROCESS_THREAD(tcp_client_process, ev, data)
 }
 #endif
 /*---------------------------------------------------------------------------*/
-#ifdef UDP_ENABLED
+#if UDP_ENABLED
+#pragma message("UDP task compilation enabled")
 PROCESS_THREAD(udp_server_process, ev, data)
 {
 
