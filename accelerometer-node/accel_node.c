@@ -66,6 +66,8 @@
 #define ETIMER                              1
 // Toggles if using James' ghetto driver mods
 #define ACCELEROMETER_DRIVERS_MODIFIED      0
+// Controls if debug statements are enabled
+#define DEBUG_PRINTING                      1
 /*---------------------------------------------------------------------------*/
 static struct etimer heartbeat;
 #if ETIMER
@@ -250,29 +252,36 @@ PROCESS_THREAD(accelerometer_process, ev, data)
 
 			if(data == &heartbeat) {
 				leds_toggle(LEDS_RED);
-//                printf("Count: %d\n\r", count);
-//                count = 0;
+#if DEBUG_PRINTING
+                printf("Count: %d\n\r", count);
+#endif
+                count = 0;
 				etimer_reset(&heartbeat);		//Reset event timer
-			} else if(data == &accel_et) {
+			}
+#if ETIMER
+            else if(data == &accel_et) {
 
                 get_mpu_reading();
+#if DEBUG_PRINTING
                 payload_print();
+#endif
                 
 				etimer_reset(&accel_et);		//Reset event timer
 
             }
-
+#else
 		//Check for sensor event
 		} else if(ev == sensors_event) {
 
 			//Check for Humidity reading
 		  	if(ev == sensors_event && data == &mpu_9250_sensor) {
 
-//                get_mpu_reading();
-
-//                payload_print();
-
+                get_mpu_reading();
+#if DEBUG_PRINTING
+                payload_print();
+#endif
 			}
+#endif
 		}
 	}
 
