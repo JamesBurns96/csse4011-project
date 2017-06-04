@@ -180,7 +180,7 @@ static void
 get_mpu_reading()
 {
 
-#if ACCEL_DRIVERS_MODIFIED
+#if ACCELEROMETER_DRIVERS_MODIFIED == 0
 
     // Get all sensor data from accelerometer    
     tcpPayload.data[payloadIndex].xGyro
