@@ -23,7 +23,12 @@ sock.bind(('',7005))
 nodeOneFile = open('nodeOne.csv', "w")
 nodeOneWriter = csv.writer(nodeOneFile, delimiter = ',')
 
+samplesPerPacket = 50
+packetOffset = 3
 
+x = 0
+firstPacketNumber = 0
+secondPacketNumber = 0
 
 
 def udpListenThread():
@@ -33,26 +38,41 @@ def udpListenThread():
     try:
       data, addr = sock.recvfrom( 1024 )
       #print "hi", data
-      
+            
       startByte = struct.unpack("B", data[0])      
       ID = struct.unpack("B", data[1])
-      ##timeStamp = struct.unpack("H", data[2:3])   
-      accX = struct.unpack("B", data[4])
-      accY = struct.unpack("B", data[5])
-      accZ = struct.unpack("B", data[5])
-      gyrX = struct.unpack("B", data[6])
-      gyrY = struct.unpack("B", data[7])
-      gyrZ = struct.unpack("B", data[8])
-      stopByte = struct.unpack("B", data[9])
-      print " ID", ID[0], " AccX:", accX[0], " AccY:", accY[0], " AccZ:", accZ[0], " gyrX:", gyrX[0], " gyrY:", gyrY[0], " gyrZ:", gyrZ[0]
+      packetNumber= struct.unpack("B", data[2])
+      timeStamp = struct.unpack("B", data[3])
+      timeStamp2 = struct.unpack("B", data[4])
+
+      #check for dropped packets and alert
+      #if (ID[0] == 0) :
+        #if (packetNumber != firstPacketNumber) :
+          #print "*****************PACKET LOST!!!!!*****************"
+        #firstPacketNumber = packetNumber + 1
+
+      #if (ID[0] == 1) :
+        #if (packetNumber != secondPacketNumber) :
+          #print "*****************PACKET LOST!!!!!*****************"
+        #secondPacketNumber = packetNumber + 1
+      
+
+      #bug, gyro values are wrong, not sure why
+      print "-------------------------------NEW PACKET----------------------------"
+      print " ID", ID[0], " samplesSinceSync", timeStamp[0]+255*timeStamp2[0], "packetNumber:", packetNumber[0]
+      x = 0
+      while (x < samplesPerPacket):
+        accX = struct.unpack("b", data[x*6 + 7])
+        accY = struct.unpack("b", data[x*6 + 8])
+        accZ = struct.unpack("b", data[x*6 + 9])
+        gyrX = struct.unpack("b", data[x*6 + 10])
+        gyrY = struct.unpack("b", data[x*6 + 11])
+        gyrZ = struct.unpack("b", data[x*6 + 12])
+        print "sampNo:", x, "AccX:", accX[0], " AccY:", accY[0], " AccZ:", accZ[0], " gyrX:", gyrX[0], " gyrY:", gyrY[0], " gyrZ:", gyrZ[0]
+        x = x + 1
 
       #write to csv file
       #nodeOneWriter.writerow(['Span'], ['dan'])
-
-
-      #timestamp = (struct.unpack("I", data[0:4]))[0]
-      #utc = datetime.datetime.fromtimestamp(timestamp)
-      #print "Reply from:", addr[0], "UTC[s]:", timestamp, "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S")
 
     except struct.error:
       pass
@@ -67,6 +87,8 @@ def udpSendThread():
 
     # send UDP packet to nodes - Replace addresses with your sensortag routing address (e.g. aaaa::<sensortag ID>)
     sock.sendto(struct.pack("I", timestamp), ("aaaa::212:4b00:c68:2d83", UDP_TIMESYNC_PORT))
+    sock.sendto(struct.pack("I", timestamp), ("aaaa::212:4b00:7b5:5c80", UDP_TIMESYNC_PORT))
+    sock.sendto(struct.pack("I", timestamp), ("aaaa::212:4b00:7b5:6d01", UDP_TIMESYNC_PORT))
     
     # sleep for 10 seconds
     time.sleep(10)

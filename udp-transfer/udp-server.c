@@ -1,36 +1,16 @@
 /*
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the Institute nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
+ * CSSE4011 driving profiling project
+ * 
+ * brief: UDP server/client for rapid transfer of accelerometer
+ *        data through to python host program
  *
- * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * This file is part of the Contiki operating system.
- *
+ * author: Daniel Clark
  */
 
 #include "contiki.h"
 #include "contiki-lib.h"
 #include "contiki-net.h"
-#include <stdio.h> /* For printf() */
+#include <stdio.h>
 #include "dev/leds.h"
 #include "dev/serial-line.h"
 #include "buzzer.h"
@@ -48,101 +28,22 @@
 #include "ti-lib.h"
 #include <stdint.h>
 #include "math.h"
-
 #include "contiki.h"
-#include "contiki-lib.h"
-#include "contiki-net.h"
-
-#include "sys/etimer.h"
 #include "sys/ctimer.h"
-
 #include "dev/leds.h"
 #include "dev/watchdog.h"
-
 #include "net/ip/uip.h"
 #include "net/ip/uip-debug.h"
 #include "net/rpl/rpl.h"
-
 #include "random.h"
-#include "board-peripherals.h"
-
-#include "ti-lib.h"
-
 #include <ctype.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "sensortag/board-peripherals.h"
 #include "sensortag/cc2650/board.h"
 #include "lib/cc26xxware/driverlib/gpio.h"
 
-/*---------------------------------------------------------------------------*/
-#define ACCEL_SAMPLES_PER_SECOND 10
-#define ACCEL_SAMPLE_PERIOD (CLOCK_SECOND/ACCEL_SAMPLES_PER_SECOND)
-
-#define START_BYTE '('
-#define STOP_BYTE ')'
-
-#define DEBUG DEBUG_PRINT
-#include "net/ip/uip-debug.h"
-
-#define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
-
-#define MAX_PAYLOAD_LEN 120
-
-#define UDP_TIMESYNC_PORT 4003 // node listens for timesync packets on port 4003
-#define UDP_REPLY_PORT 4004 // node listens for reply packets on port 7005
-
-#define _CL_RED             0
-#define _CL_GREEN           1
-#define _CL_BLUE            2
-#define _CLK_PULSE_DELAY    20
-
-#define UIP_CONF_ROUTER 1
-
-#define TAG_ID 0
-
-/*---------------------------------------------------------------------------*/
-#define ACCEL_ENABLED 1
-#define TCP_ENABLED
-#define UDP_ENABLED
-/*---------------------------------------------------------------------------*/
-static struct etimer heartbeat, tcp_et;
-
-static uip_ipaddr_t addr;
-
-static struct uip_udp_conn *server_conn;
-
-clock_time_t next = ACCEL_SAMPLE_PERIOD;
-
-#if UIP_CONF_ROUTER
-  uip_ipaddr_t ipaddr;
-#endif /* UIP_CONF_ROUTER */
-
-/*---------------------------------------------------------------------------*/
-#pragma pack(1)
-typedef struct AccelData {
-    uint8_t xAcc;
-    uint8_t yAcc;
-    uint8_t zAcc;
-    uint8_t xGyro;
-    uint8_t yGyro;
-    uint8_t zGyro;
-}AccelData;
-/*---------------------------------------------------------------------------*/
-#pragma pack(1)
-typedef struct Payload {
-    uint8_t startByte;
-    uint8_t id;
-    uint16_t timeStamp;
-    AccelData data[ACCEL_SAMPLES_PER_SECOND];
-    uint8_t stopByte;
-} Payload;
-
-Payload tcpPayload;
-/*---------------------------------------------------------------------------*/
 /*-COMPILATION_CONFIG_OPTIONS------------------------------------------------*/
 // Toggles which processes are enabled
 #define ACCEL_ENABLED                       1
@@ -162,28 +63,77 @@ Payload tcpPayload;
 #ifndef BORDER_ROUTER_IP6_ADDR_CHOSEN
 #warning "PICK AN IP6 ADDR FOR THE BORDER ROUTER"
 #endif
-/*---------------------------------------------------------------------------*/
-static struct ctimer mpu_timer;		//Callback timer
-/*---------------------------------------------------------------------------*/
-/*static void init_mpu_reading(void *not_used);
-static void get_mpu_reading();
-static void tcp_payload_init(void);
 
-static void payload_print(void);*/
+#define SAMPLES_PER_PACKET 50
+#define ACCEL_SAMPLE_PERIOD (CLOCK_SECOND/SAMPLES_PER_PACKET)
+
+#define SAMPLES_PER_SECOND 100
+
+//#define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*12))
+#define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*6))
+
+#define START_BYTE '('
+#define STOP_BYTE ')'
+
+#define DEBUG DEBUG_PRINT
+#include "net/ip/uip-debug.h"
+
+#define UIP_IP_BUF   ((struct uip_ip_hdr *)&uip_buf[UIP_LLH_LEN])
+
+#define MAX_PAYLOAD_LEN 200//this has been modified in the router file
+#define UIP_CONF_ROUTER 1
+
+#define TAG_ID 2
+
+/*---------------------------------------------------------------------------*/
+
+static struct uip_udp_conn *server_conn;
+
+clock_time_t next = ACCEL_SAMPLE_PERIOD;
+
+#if UIP_CONF_ROUTER
+  uip_ipaddr_t ipaddr;
+#endif /* UIP_CONF_ROUTER */
+
+/*---------------------------------------------------------------------------*/
+#pragma pack(1)
+typedef struct AccelData {//12 bytes
+    int8_t xAcc;
+    int8_t yAcc;
+    int8_t zAcc;
+    int8_t xGyro;
+    int8_t yGyro;
+    int8_t zGyro;
+}AccelData;
+/*---------------------------------------------------------------------------*/
+#pragma pack(1)
+typedef struct Payload {
+    uint8_t startByte;
+    uint8_t id;
+    uint8_t packetNumber;
+    uint32_t timeStamp;//**************************************************************************************************************
+    AccelData data[SAMPLES_PER_PACKET];
+    uint8_t stopByte;
+} Payload;
+
+Payload tcpPayload;
+/*---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------*/
 void udp_send_payload(void);
 void udp_send_data(void);
 void udp_send_data2(void);
 
 /*---------------------------------------------------------------------------*/
 static struct uip_udp_conn *server_conn;
-static struct etimer et;
 static struct etimer buzz;
 
 uint32_t UTCTime = 0;
-static uint16_t timeStamp = 0;
+static uint32_t timeStamp = 0;
 static uint8_t payloadIndex = 0;
 static uint8_t count = 0;
 int secondTimer = 0;
+int sampleCounter = 0;
 
 /*---------------------------------------------------------------------------*/
 //PROCESS(buzzer_process, "buzzer process");
@@ -209,14 +159,12 @@ tcpip_handler(void)
 
       UTCTime = *(uint32_t*)uip_appdata;
 
+      timeStamp = 0;          
+      tcpPayload.timeStamp = timeStamp;
+      tcpPayload.packetNumber = 0;
+
       udp_send_data();
     }
-}
-/*---------------------------------------------------------------------------*/
-static void
-tcp_timeout_handler(void)
-{
-    uip_send((char*)&tcpPayload, sizeof(struct Payload));
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -237,6 +185,7 @@ tcp_payload_init(void)
     tcpPayload.id = TAG_ID;
     tcpPayload.stopByte = STOP_BYTE;
     tcpPayload.timeStamp = timeStamp;
+    tcpPayload.packetNumber = 0;
 
     payloadIndex = 0;
 }
@@ -245,21 +194,21 @@ static void
 get_mpu_reading()
 {
 
-#if ACCELEROMETER_DRIVERS_MODIFIED == 0
+#if ACCELEROMETER_DRIVERS_MODIFIED == payloadIndex
 
     // Get all sensor data from accelerometer    
     tcpPayload.data[payloadIndex].xGyro
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X);
     tcpPayload.data[payloadIndex].yGyro
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y);
     tcpPayload.data[payloadIndex].zGyro
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z);
     tcpPayload.data[payloadIndex].xAcc
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X);
     tcpPayload.data[payloadIndex].yAcc
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y);
     tcpPayload.data[payloadIndex].zAcc
-            = (int16_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
+            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
 
 #else
 
@@ -272,7 +221,7 @@ get_mpu_reading()
     tcpPayload.data[payloadIndex].zGyro = accRead[2];
 
     accRead= (uint16_t *)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC);
-    
+    tcpPayload.timeStamp = timeStamp;
     tcpPayload.data[payloadIndex].xAcc = accRead[0];
     tcpPayload.data[payloadIndex].yAcc = accRead[1];
     tcpPayload.data[payloadIndex].zAcc = accRead[2];
@@ -283,7 +232,7 @@ get_mpu_reading()
     ctimer_set(&mpu_timer, next, init_mpu_reading, NULL);
 #endif
     // increase payload index 
-    payloadIndex = ((payloadIndex + 1) % ACCEL_SAMPLES_PER_SECOND);
+    payloadIndex = ((payloadIndex + 1) % SAMPLES_PER_PACKET);
 
     ++count;
 
@@ -337,32 +286,38 @@ PROCESS_THREAD(udp_server_process, ev, data)
   server_conn = udp_new(NULL, UIP_HTONS(7005), NULL);
   udp_bind(server_conn, UIP_HTONS(4003));
 
-  //etimer_set(&heartbeat, HEARTBEAT_PERIOD);	//Set event timer for 20s interval.
   init_mpu_reading(NULL);
   tcp_payload_init();
-  etimer_set(&buzz, CLOCK_SECOND/100);	//Set event timer for 0.1s interval.
+  etimer_set(&buzz, CLOCK_SECOND/SAMPLES_PER_SECOND);	//Set event timer for 0.1s interval.
 
   while(1) {
     PROCESS_YIELD();
 
-	//Wait for tcipip event to occur
+	  //Wait for tcipip event to occur
     if(ev == tcpip_event) {
       tcpip_handler();
     }
     if(ev == PROCESS_EVENT_TIMER) {
 
 			if(data == &buzz) {
-        UTCTime++;          
+        timeStamp++;          
+        tcpPayload.timeStamp = timeStamp;
         //udp_send_data2();     
 
         get_mpu_reading();
 
         payload_print();
+        sampleCounter++;
 
-        udp_send_payload();     
+        //if a new packet has been loaded with all the samples needed
+        //send the udp packet
+        if (sampleCounter == SAMPLES_PER_PACKET) {
+          sampleCounter = 0;
+          tcpPayload.packetNumber++;
+          udp_send_payload();
+        }             
 
         etimer_reset(&buzz);
-
         
       }
     }
@@ -380,7 +335,7 @@ void udp_send_payload(void) {
 
   uip_ipaddr_copy(&ipaddr, &UIP_IP_BUF->srcipaddr);
 
-  uip_udp_packet_send(server_conn, &tcpPayload, 11);
+  uip_udp_packet_send(server_conn, &tcpPayload, PAYLOAD_SIZE);
 }
 
 void udp_send_data(void) {    
@@ -392,7 +347,7 @@ void udp_send_data(void) {
 
     uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
 
-    uip_udp_packet_send(server_conn, &tcpPayload, 11);
+    uip_udp_packet_send(server_conn, &tcpPayload, PAYLOAD_SIZE);
 }
 
 void udp_send_data2(void) {    
