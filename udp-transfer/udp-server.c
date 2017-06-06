@@ -70,7 +70,7 @@
 #define SAMPLES_PER_SECOND 20
 
 //#define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*12))
-#define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*6))
+#define PAYLOAD_SIZE (8+(SAMPLES_PER_PACKET*6))
 
 #define START_BYTE '('
 #define STOP_BYTE ')'
@@ -84,7 +84,7 @@
 #define UIP_CONF_ROUTER 1
 
 
-#define TAG_ID 4
+#define TAG_ID 0
 
 /*---------------------------------------------------------------------------*/
 
@@ -111,7 +111,7 @@ typedef struct AccelData {//12 bytes
 typedef struct Payload {
     uint8_t startByte;
     uint8_t id;
-    uint8_t packetNumber;
+    uint16_t packetNumber;
     uint32_t timeStamp;//**************************************************************************************************************
     AccelData data[SAMPLES_PER_PACKET];
     uint8_t stopByte;
@@ -128,6 +128,7 @@ void udp_send_data2(void);
 /*---------------------------------------------------------------------------*/
 static struct uip_udp_conn *server_conn;
 static struct etimer buzz;
+static struct etimer timeSyncTimer;
 
 uint32_t UTCTime = 0;
 static uint32_t timeStamp = 0;
@@ -160,9 +161,9 @@ tcpip_handler(void)
 
       UTCTime = *(uint32_t*)uip_appdata;
 
-      timeStamp = 0;          
-      tcpPayload.timeStamp = timeStamp;
-      tcpPayload.packetNumber = 0;
+      timeStamp = UTCTime;          
+      tcpPayload.timeStamp = UTCTime;
+      //tcpPayload.packetNumber = 0;
 
       udp_send_data();
     }
@@ -174,9 +175,11 @@ payload_print(void)
     printf("xAcc: %d, yAcc: %d, zAcc: %d, xGyro: %d, yGyro: %d, zGyro: %d\n\r",
         tcpPayload.data[payloadIndex].xAcc, tcpPayload.data[payloadIndex].yAcc,
         tcpPayload.data[payloadIndex].zAcc,
-        (int)((1.0 * tcpPayload.data[payloadIndex].xGyro) / (65536/500)),
-        (int)((1.0 * tcpPayload.data[payloadIndex].yGyro) / (65536/500)),
-        (int)((1.0 * tcpPayload.data[payloadIndex].zGyro) / (65536/500)));
+//        (int)((1.0 * tcpPayload.data[payloadIndex].xGyro) / (65536/500)),
+//        (int)((1.0 * tcpPayload.data[payloadIndex].yGyro) / (65536/500)),
+//        (int)((1.0 * tcpPayload.data[payloadIndex].zGyro) / (65536/500)));
+        tcpPayload.data[payloadIndex].xGyro, tcpPayload.data[payloadIndex].yGyro,
+        tcpPayload.data[payloadIndex].zGyro);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -199,11 +202,11 @@ get_mpu_reading()
 
     // Get all sensor data from accelerometer    
     tcpPayload.data[payloadIndex].xGyro
-            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X);
+            = (int8_t)((mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X) * 1.0) / (2 * 65536/500.0));
     tcpPayload.data[payloadIndex].yGyro
-            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y);
+            = (int8_t)((mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y) * 1.0) / (2 * 65536/500.0));
     tcpPayload.data[payloadIndex].zGyro
-            = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z);
+            = (int8_t)((mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z) * 1.0) / (2 * 65536/500.0));
     tcpPayload.data[payloadIndex].xAcc
             = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X);
     tcpPayload.data[payloadIndex].yAcc
@@ -290,6 +293,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
   init_mpu_reading(NULL);
   tcp_payload_init();
   etimer_set(&buzz, CLOCK_SECOND/SAMPLES_PER_SECOND);	//Set event timer for 0.1s interval.
+  etimer_set(&timeSyncTimer, CLOCK_SECOND);
 
   while(1) {
     PROCESS_YIELD();
@@ -301,8 +305,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
     if(ev == PROCESS_EVENT_TIMER) {
 
 			if(data == &buzz) {
-        timeStamp++;          
-        tcpPayload.timeStamp = timeStamp;
+        
         //udp_send_data2();     
 
         get_mpu_reading();
@@ -320,6 +323,10 @@ PROCESS_THREAD(udp_server_process, ev, data)
 
         etimer_reset(&buzz);
         
+      } else if (data == &timeSyncTimer) {
+        timeStamp++;
+        tcpPayload.timeStamp = timeStamp;
+        etimer_reset(&timeSyncTimer);
       }
     }
   }
