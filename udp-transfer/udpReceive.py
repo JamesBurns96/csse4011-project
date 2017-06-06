@@ -13,6 +13,8 @@ import csv
 UDP_TIMESYNC_PORT = 4003 # node listens for timesync packets on port 4003
 UDP_REPLY_PORT = 7005 # node listens for reply packets on port 7005
 
+NUMBER_OF_NODES = 6
+
 isRunning = True
 
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, 0)
@@ -23,12 +25,17 @@ sock.bind(('',7005))
 nodeOneFile = open('nodeOne.csv', "w")
 nodeOneWriter = csv.writer(nodeOneFile, delimiter = ',')
 
-samplesPerPacket = 50
+samplesPerPacket = 20
 packetOffset = 3
 
 x = 0
 firstPacketNumber = 0
 secondPacketNumber = 0
+
+outputFiles = []
+
+for i in range(NUMBER_OF_NODES):
+    outputFiles.append(open(str(i) + '.csv','w+'))
 
 
 def udpListenThread():
@@ -42,8 +49,10 @@ def udpListenThread():
       startByte = struct.unpack("B", data[0])      
       ID = struct.unpack("B", data[1])
       packetNumber= struct.unpack("B", data[2])
-      timeStamp = struct.unpack("B", data[3])
-      timeStamp2 = struct.unpack("B", data[4])
+      timeStamp = (struct.unpack("B", data[3])) << 24
+      timeStamp += (struct.unpack("B", data[4])) << 16
+      timeStamp += (struct.unpack("B", data[5])) << 8
+      timeStamp += (struct.unpack("B", data[6]))
 
       #check for dropped packets and alert
       #if (ID[0] == 0) :
@@ -68,6 +77,12 @@ def udpListenThread():
         gyrX = struct.unpack("b", data[x*6 + 10])
         gyrY = struct.unpack("b", data[x*6 + 11])
         gyrZ = struct.unpack("b", data[x*6 + 12])
+
+        if ID < NUMBER_OF_NODES:
+            outputFiles[ID].write(str(ID) + ',' + str(timeStamp) +  ',' + str(x) + ','
+                            + str(accX) + ',' + str(accY) + ',' + str(accZ) + ','
+                            + str(gyrX) + ',' + str(gyrY) + ',' + str(gyrZ) + '\n')
+
         print "sampNo:", x, "AccX:", accX[0], " AccY:", accY[0], " AccZ:", accZ[0], " gyrX:", gyrX[0], " gyrY:", gyrY[0], " gyrZ:", gyrZ[0]
         x = x + 1
 
@@ -116,6 +131,8 @@ except KeyboardInterrupt:
   print "Keyboard interrupt received. Exiting."
   isRunning = False  
   sock.close()
+  for i in range(NUMBER_OF_NODES):
+    outputFiles[i].close()
   raise SystemExit
   
 
