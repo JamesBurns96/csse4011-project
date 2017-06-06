@@ -64,10 +64,10 @@
 #warning "PICK AN IP6 ADDR FOR THE BORDER ROUTER"
 #endif
 
-#define SAMPLES_PER_PACKET 50
+#define SAMPLES_PER_PACKET 20
 #define ACCEL_SAMPLE_PERIOD (CLOCK_SECOND/SAMPLES_PER_PACKET)
 
-#define SAMPLES_PER_SECOND 100
+#define SAMPLES_PER_SECOND 20
 
 //#define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*12))
 #define PAYLOAD_SIZE (7+(SAMPLES_PER_PACKET*6))
@@ -83,7 +83,8 @@
 #define MAX_PAYLOAD_LEN 200//this has been modified in the router file
 #define UIP_CONF_ROUTER 1
 
-#define TAG_ID 2
+
+#define TAG_ID 4
 
 /*---------------------------------------------------------------------------*/
 
@@ -194,7 +195,7 @@ static void
 get_mpu_reading()
 {
 
-#if ACCELEROMETER_DRIVERS_MODIFIED == payloadIndex
+#if ACCELEROMETER_DRIVERS_MODIFIED == 0
 
     // Get all sensor data from accelerometer    
     tcpPayload.data[payloadIndex].xGyro
