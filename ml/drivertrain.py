@@ -2,8 +2,6 @@ import csv
 import numpy as np
 import time
 
-import RNN
-
 SEQUENCE_START = -1000
 SEQUENCE_STOP = -2000
 NO_DATA = -3000
@@ -65,15 +63,3 @@ assert(data_james.shape[1] == NUM_FEATURES)
 data_dan = load_data('data/dan0/')
 print 'loaded dan0 data. shape ', data_dan.shape
 assert(data_dan.shape[1] == NUM_FEATURES)
-
-model = RNN.RNN(NUM_FEATURES, NUM_DRIVERS)
-
-print "Expected Loss for random predictions: %f" % np.log(NUM_DRIVERS)
-# print "Actual loss: %f" % model.cost(X_train[:100], y_train[:100])
-#
-# t1 = time.time()
-# # model.sgd_step(X_train[10], y_train[10], 0.005)
-# t2 = time.time()
-# print "STEP TIME: ", (t2-t1)*1000.0
-#
-# # model.sgd_train(X_train[:1000], y_train[:1000])
