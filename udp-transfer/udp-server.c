@@ -204,6 +204,7 @@ get_mpu_reading()
 #if ACCELEROMETER_DRIVERS_MODIFIED == 0
 
     // Get all sensor data from accelerometer    
+    /*
     tcpPayload.data[payloadIndex].xGyro
             = (int8_t)((mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X) * 1.0) / (2 * 65536/500.0));
     tcpPayload.data[payloadIndex].yGyro
@@ -216,6 +217,19 @@ get_mpu_reading()
             = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y);
     tcpPayload.data[payloadIndex].zAcc
             = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
+            */
+    tcpPayload.data[payloadIndex].xGyro
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X) / 200);
+    tcpPayload.data[payloadIndex].yGyro
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y) / 200);
+    tcpPayload.data[payloadIndex].zGyro
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Z) / 200);
+    tcpPayload.data[payloadIndex].xAcc
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_X) / 2);
+    tcpPayload.data[payloadIndex].yAcc
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Y) / 2);
+    tcpPayload.data[payloadIndex].zAcc
+            = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z) / 2);
 
 #else
 

@@ -16,6 +16,7 @@ import serial
 import threading
 import json
 import time
+import collections
 
 import matplotlib
 matplotlib.use('WXAgg')
@@ -43,6 +44,9 @@ class UDPComs(object):
     title = 'Demo'
 
     def __init__(self, graphFrame):      
+      #generate graph object
+      self.graph = graphFrame
+
       #generate socket connection
       self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, 0)
       self.sock.bind(('',7005))
@@ -80,9 +84,9 @@ class UDPComs(object):
         try:
           data, addr = self.sock.recvfrom(1024)
           #print "hi", data                
-          startByte = struct.unpack("B", data[0])      
+          startByte = struct.unpack("B", data[0])
           ID = struct.unpack("B", data[1])
-          packetNumber= struct.unpack("H", data[2:4])      
+          packetNumber= struct.unpack("H", data[2:4])
           timeStamp = struct.unpack("I", data[4:8])
 
           #check for dropped packets and alert
@@ -111,13 +115,20 @@ class UDPComs(object):
             gyrX = struct.unpack("b", data[x*6 + 11])
             gyrY = struct.unpack("b", data[x*6 + 12])
             gyrZ = struct.unpack("b", data[x*6 + 13])
-            #print "sampNo:", x, "AccX:", accX[0], " AccY:", accY[0], " AccZ:", accZ[0], " gyrX:", gyrX[0]*2*90/95, " gyrY:", gyrY[0]*2*90/95, " gyrZ:", gyrZ[0]*2*90/95
             x = x + 1
 
+            #print "sampNo:", x, "AccX:", accX[0]*2, " AccY:", accY[0]*2, " AccZ:", accZ[0]*2, " gyrX:", gyrX[0]*2, " gyrY:", gyrY[0]*2, " gyrZ:", gyrZ[0]*2            
+
+            #save to CSV file
             if ID[0] < NUMBER_OF_NODES:  
               self.outputFiles[ID[0]].write(str(ID[0]) + ',' + str(timeStamp[0]) + ',' + str(packetNumber[0]) + ',' + str(x) + ','
-                              + str(accX[0]) + ',' + str(accY[0]) + ',' + str(accZ[0]) + ','
-                              + str(gyrX[0]*2*90/95) + ',' + str(gyrY[0]*2*90/95) + ',' + str(gyrZ[0]*2*90/95) + '\n')
+                              + str(accX[0]*2) + ',' + str(accY[0]*2) + ',' + str(accZ[0]*2) + ','
+                              + str(gyrX[0]*2) + ',' + str(gyrY[0]*2) + ',' + str(gyrZ[0]*2) + '\n')
+
+            # update plot
+            if isinstance(self.graph, wx.Frame):
+                self.graph.update_data(float(gyrX[0]*2), float(gyrY[0]*2), float(gyrZ[0]*2))
+                wx.CallAfter(self.graph.draw_plot)                              
 
         except socket.timeout:
           print "FUUUk"
@@ -171,9 +182,9 @@ class GraphFrame(wx.Frame):
         # set data source
         self.source = UDPComs(self)
         
-        self.data_temp = []
-        self.data_pres = []
-        self.data_alt = []
+        self.data_temp = collections.deque(maxlen=500)
+        self.data_pres = collections.deque(maxlen=500)
+        self.data_alt = collections.deque(maxlen=500)
         
         self.create_main_panel()
         
@@ -244,8 +255,8 @@ class GraphFrame(wx.Frame):
         """ Redraws the plot
         """
 
-        xmax = len(self.data_temp) if len(self.data_temp) > 50 else 50
-        xmin = xmax - 50
+        xmax = len(self.data_temp) if len(self.data_temp) > 200 else 200
+        xmin = xmax - 200
 
         ymin = round(min(self.data_temp), 0) - 1
         ymax = round(max(self.data_temp), 0) + 1
@@ -262,8 +273,8 @@ class GraphFrame(wx.Frame):
 
 
 
-        xmax = len(self.data_pres) if len(self.data_pres) > 50 else 50
-        xmin = xmax - 50
+        xmax = len(self.data_pres) if len(self.data_pres) > 200 else 200
+        xmin = xmax - 200
 
         ymin = round(min(self.data_pres), 0) - 1
         ymax = round(max(self.data_pres), 0) + 1
@@ -280,8 +291,9 @@ class GraphFrame(wx.Frame):
 
 
 
-        xmax = len(self.data_alt) if len(self.data_alt) > 50 else 50
-        xmin = xmax - 50
+        xmax = len(self.data_alt) if len(self.data_alt) > 200 else 200
+        #xmin = xmax - 50
+        xmin = xmax - 200
 
         ymin = round(min(self.data_alt), 0) - 1
         ymax = round(max(self.data_alt), 0) + 1
