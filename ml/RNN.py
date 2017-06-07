@@ -12,14 +12,14 @@ class RNN(object):
     http://www.wildml.com/2015/09/recurrent-neural-networks-tutorial-part-2-implementing-a-language-model-rnn-with-
                                     python-numpy-and-theano/
     """
-    def __init__(self, xdim, ydim, hidden_dim=50, bptt_trunc=10):
+    def __init__(self, xdim, ydim, hidden_dim=500, bptt_trunc=10):
         self.xdim = xdim
         self.ydim = ydim
         self.hidden_dim = hidden_dim
         self.bptt_trunc = bptt_trunc
 
         U = np.random.uniform(-1, 1, (hidden_dim, xdim)) / np.sqrt(xdim)
-        V = np.random.uniform(-1, 1, (xdim, hidden_dim)) / np.sqrt(hidden_dim)
+        V = np.random.uniform(-1, 1, (ydim, hidden_dim)) / np.sqrt(hidden_dim)
         W = np.random.uniform(-1, 1, (hidden_dim, hidden_dim)) / np.sqrt(hidden_dim)
 
         self.U = theano.shared(name='U', value=U.astype(theano.config.floatX))
@@ -87,16 +87,22 @@ class RNN(object):
         return np.argmax(o, axis=1)
 
     def cost(self, xt, yt):
-        return np.sum([self.ce_error(x,y) for x,y in zip(xt, yt)]) / \
+        return np.sum([self.ce_error(x, y) for (x, y) in zip(xt, yt)]) / \
                 np.sum([len(y) for y in yt])
 
-    def sgd_train(self, X, y, alpha=0.005, epochs=100, eval_loss=10):
-        examples_seen = 0
+    def sgd_train(self, X, y, alpha=0.005, epochs=100):
+        losses = []
         for e in range(epochs):
-            # if e % eval_loss == 0:
+
             loss = self.cost(X, y)
+            losses.append(loss)
             print 'Loss: ', loss
 
+            if (len(losses) > 2) and (losses[-1] > losses[-2]):
+                print 'Going backwards!'
+                break
+
             for (xs, ys) in zip(X, y):
+                assert(len(xs) == self.xdim)
+                assert(len(ys) == self.ydim)
                 self.sgd_step(xs, ys, alpha)
-                examples_seen += 1
