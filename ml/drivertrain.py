@@ -1,11 +1,10 @@
 import csv
 import numpy as np
-import time
 
 SEQUENCE_START = -1000
 SEQUENCE_STOP = -2000
 NO_DATA = -3000
-NUM_FEATURES = 36
+NUM_FEATURES = 30
 NUM_DRIVERS = 2
 
 
@@ -20,7 +19,7 @@ def outer_join(alist, blist):
 def load_data(directory):
     data = dict()
 
-    FILES_AND_PREFIXES = [('acc.csv', 'acc'), ('brake.csv', 'brk'),
+    FILES_AND_PREFIXES = [('acc.csv', 'acc'), #('brake.csv', 'brk'),
                           ('clutch.csv', 'cl'), ('gear.csv', 'gr'),
                           ('rigid.csv', 'rgd'), ('steer.csv', 'st')]
 
@@ -45,10 +44,9 @@ def load_data(directory):
     for ts in data:
         if last_ts is not None:
             assert(last_ts < ts)
-
         raw_line = []
-
         dat = data[ts]
+
         for (p, s) in outer_join([p[1] for p in FILES_AND_PREFIXES], SENSOR_SUFFIXES):
             raw_line.append(dat.get(p + '-' + s, NO_DATA))
 
@@ -56,10 +54,19 @@ def load_data(directory):
 
     return np.asarray(data_raw)
 
-data_james = load_data('data/james/')
-print 'loaded james data. shape ', data_james.shape
-assert(data_james.shape[1] == NUM_FEATURES)
+for fn in 'james,dan0,dan1'.split(','):
+    data_james = load_data('data/' + fn)
+    print 'loaded james data. shape ', data_james.shape
+    assert(data_james.shape[1] == NUM_FEATURES)
 
-data_dan = load_data('data/dan0/')
-print 'loaded dan0 data. shape ', data_dan.shape
-assert(data_dan.shape[1] == NUM_FEATURES)
+    james_missing_count = 0
+    for datum in data_james:
+        missing = False
+        for component in datum:
+            if component == -3000:
+                missing = True
+        if missing:
+            james_missing_count += 1
+
+    print 'missed {0} of {2}\' packets. {1}%'.\
+        format(james_missing_count, 100.*james_missing_count/data_james.shape[0], fn)
