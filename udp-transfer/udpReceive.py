@@ -103,7 +103,9 @@ class UDPComs(object):
 
                     # update plot
                     if isinstance(self.graph, GraphFrame):
-                        self.graph.update_data(float(gyrX[0] * 2), float(gyrY[0] * 2), float(gyrZ[0] * 2))
+                        self.graph.update_data('t' + str(id[0]) + '-ax', float(gyrX[0] * 2))
+                        self.graph.update_data('t' + str(id[0]) + '-ay', float(gyrY[0] * 2))
+                        self.graph.update_data('t' + str(id[0]) + '-az', float(gyrZ[0] * 2))
                         wx.CallAfter(self.graph.draw_plot)
 
             except socket.timeout:
@@ -147,6 +149,10 @@ class GraphFrame(wx.Frame):
     """ The main frame of the application
     """
     title = 'Demo'
+    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax',
+                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay',
+                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az']
+    PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
         wx.Frame.__init__(self, None, -1, self.title)
@@ -158,16 +164,9 @@ class GraphFrame(wx.Frame):
         self.source = UDPComs(self)
 
         self.plots = dict()
-        self.plots['temp'] = Plot()
-        self.plots['pres'] = Plot()
-        self.plots['alt'] = Plot()
-        # self.data_temp = collections.deque(maxlen=500)
-        self.data_pres = collections.deque(maxlen=500)
-        self.data_alt = collections.deque(maxlen=500)
+        for key in self.PLOT_KEYS:
+            self.plots[key] = Plot()
 
-        self.create_main_panel()
-
-    def create_main_panel(self):
         self.panel = wx.Panel(self)
 
         self.init_plot()
@@ -181,98 +180,41 @@ class GraphFrame(wx.Frame):
 
     def init_plot(self):
         self.fig = Figure((6.0, 3.0), dpi=100)
+        for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
+            self.plots[key].axes = self.fig.add_subplot(3, 6, idx+1)
+            self.plots[key].axes.set_facecolor('black')
+            self.plots[key].axes.set_title(key, size=12)
 
-        ############################# TEMPERATURE
-        self.plots['temp'].axes = self.fig.add_subplot(3, 1, 1)
-        self.plots['temp'].axes.set_facecolor('black')
-        self.plots['temp'].axes.set_title('Temperature', size=12)
+            pylab.setp(self.plots[key].axes.get_xticklabels(), fontsize=8)
+            pylab.setp(self.plots[key].axes.get_yticklabels(), fontsize=8)
 
-        pylab.setp(self.plots['temp'].axes.get_xticklabels(), fontsize=8)
-        pylab.setp(self.plots['temp'].axes.get_yticklabels(), fontsize=8)
+            # plot the data as a line series, and save the reference
+            # to the plotted line series
+            self.plots[key].plot = self.plots[key].axes.plot(self.plots[key].data, linewidth=1, color=(1, 1, 0))[0]
 
-        # plot the data as a line series, and save the reference 
-        # to the plotted line series
-        self.plots['temp'].plot = self.plots['temp'].axes.plot(self.plots['temp'].data, linewidth=1, color=(1, 1, 0))[0]
-
-        ############################# PRESSURE
-        self.axes_pres = self.fig.add_subplot(3, 1, 2)
-        self.axes_pres.set_facecolor('black')
-        self.axes_pres.set_title('Pressure', size=12)
-
-        pylab.setp(self.axes_pres.get_xticklabels(), fontsize=8)
-        pylab.setp(self.axes_pres.get_yticklabels(), fontsize=8)
-
-        # plot the data as a line series, and save the reference 
-        # to the plotted line series
-        self.plot_data_pres = self.axes_pres.plot(self.data_pres, linewidth=1, color=(1, 1, 0))[0]
-
-        ############################# ALTITUDE
-        self.axes_alt = self.fig.add_subplot(3, 1, 3)
-        self.axes_alt.set_facecolor('black')
-        self.axes_alt.set_title('Altitude', size=12)
-
-        pylab.setp(self.axes_alt.get_xticklabels(), fontsize=8)
-        pylab.setp(self.axes_alt.get_yticklabels(), fontsize=8)
-
-        # plot the data as a line series, and save the reference 
-        # to the plotted line series
-        self.plot_data_alt = self.axes_alt.plot(self.data_alt, linewidth=1, color=(1, 1, 0))[0]
-
-    def update_data(self, sensor, pres, alt):
-        self.plots['temp'].data.append(sensor)
-        # self.data_temp.append(sensor)
-        self.data_pres.append(pres)
-        self.data_alt.append(alt)
+    def update_data(self, key, val):
+        self.plots[key].data.append(val)
 
     def draw_plot(self):
         """ Redraws the plot
         """
+        for key in self.PLOT_KEYS:
+            xmax = len(self.plots[key].data) if len(self.plots[key].data) > 200 else 200
+            xmin = xmax - 200
 
-        xmax = len(self.plots['temp'].data) if len(self.plots['temp'].data) > 200 else 200
-        xmin = xmax - 200
+            # ymin = round(min(self.plots[key].data), 0) - 1
+            # ymax = round(max(self.plots[key].data), 0) + 1
+            ymin = -250
+            ymax = 250
 
-        ymin = round(min(self.plots['temp'].data), 0) - 1
-        ymax = round(max(self.plots['temp'].data), 0) + 1
+            self.plots[key].axes.set_xbound(lower=xmin, upper=xmax)
+            self.plots[key].axes.set_ybound(lower=ymin, upper=ymax)
+            self.plots[key].axes.grid(True, color='gray')
 
-        self.plots['temp'].axes.set_xbound(lower=xmin, upper=xmax)
-        self.plots['temp'].axes.set_ybound(lower=ymin, upper=ymax)
-        self.plots['temp'].axes.grid(True, color='gray')
+            pylab.setp(self.plots[key].axes.get_xticklabels(), visible=True)
 
-        pylab.setp(self.plots['temp'].axes.get_xticklabels(), visible=True)
-
-        self.plots['temp'].plot.set_xdata(np.arange(len(self.plots['temp'].data)))
-        self.plots['temp'].plot.set_ydata(np.array(self.plots['temp'].data))
-
-        xmax = len(self.data_pres) if len(self.data_pres) > 200 else 200
-        xmin = xmax - 200
-
-        ymin = round(min(self.data_pres), 0) - 1
-        ymax = round(max(self.data_pres), 0) + 1
-
-        self.axes_pres.set_xbound(lower=xmin, upper=xmax)
-        self.axes_pres.set_ybound(lower=ymin, upper=ymax)
-
-        self.axes_pres.grid(True, color='gray')
-        pylab.setp(self.axes_pres.get_xticklabels(), visible=True)
-
-        self.plot_data_pres.set_xdata(np.arange(len(self.data_pres)))
-        self.plot_data_pres.set_ydata(np.array(self.data_pres))
-
-        xmax = len(self.data_alt) if len(self.data_alt) > 200 else 200
-        # xmin = xmax - 50
-        xmin = xmax - 200
-
-        ymin = round(min(self.data_alt), 0) - 1
-        ymax = round(max(self.data_alt), 0) + 1
-
-        self.axes_alt.set_xbound(lower=xmin, upper=xmax)
-        self.axes_alt.set_ybound(lower=ymin, upper=ymax)
-
-        self.axes_alt.grid(True, color='gray')
-        pylab.setp(self.axes_alt.get_xticklabels(), visible=True)
-
-        self.plot_data_alt.set_xdata(np.arange(len(self.data_alt)))
-        self.plot_data_alt.set_ydata(np.array(self.data_alt))
+            self.plots[key].plot.set_xdata(np.arange(len(self.plots[key].data)))
+            self.plots[key].plot.set_ydata(np.array(self.plots[key].data))
 
         self.canvas.draw()
 
