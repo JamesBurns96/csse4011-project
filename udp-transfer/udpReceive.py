@@ -34,9 +34,9 @@ class UDPComs(object):
     """
     title = 'Demo'
 
-    def __init__(self, graphFrame):
+    def __init__(self, graph_frame):
         # generate graph object
-        self.graph = graphFrame
+        self.graph = graph_frame
 
         # generate socket connection
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, 0)
@@ -58,13 +58,13 @@ class UDPComs(object):
                                       + "gyrX" + ',' + "gyrY" + ',' + "gyrZ" + '\n')
 
         # start UDP listener thread
-        t1 = Thread(target=self.udp_listen_thread)
-        t1.start()
+        self.t1 = Thread(target=self.udp_listen_thread)
+        self.t1.start()
         print "Listening for incoming packets on UDP port", UDP_REPLY_PORT
 
         # start UDP timesync sender thread
-        t2 = Thread(target=self.udp_send_thread)
-        t2.start()
+        self.t2 = Thread(target=self.udp_send_thread)
+        self.t2.start()
 
         print "Sending timesync packets on UDP port", UDP_TIMESYNC_PORT
         print "Exit application by pressing (CTRL-C)"
@@ -73,16 +73,16 @@ class UDPComs(object):
         while self.isRunning:
             try:
                 data, addr = self.sock.recvfrom(1024)
-                startByte = struct.unpack("B", data[0])
-                ID = struct.unpack("B", data[1])
-                packetNumber = struct.unpack("H", data[2:4])
-                timeStamp = struct.unpack("I", data[4:8])
+                start_byte = struct.unpack("B", data[0])
+                id = struct.unpack("B", data[1])
+                packet_number = struct.unpack("H", data[2:4])
+                time_stamp = struct.unpack("I", data[4:8])
 
                 # BUG:, gyro values are wrong, not sure why
-                utc = datetime.datetime.fromtimestamp(timeStamp[0])
+                utc = datetime.datetime.fromtimestamp(time_stamp[0])
                 print "-------------------------------NEW PACKET----------------------------"
-                print " ID", ID[0], " UTC(s)", timeStamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
-                    "packetNumber:", packetNumber[0]
+                print " ID", id[0], " UTC(s)", time_stamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
+                    "packetNumber:", packet_number[0]
                 x = 0
                 while (x < samplesPerPacket):
                     accX = struct.unpack("b", data[x * 6 + 8])
@@ -91,15 +91,12 @@ class UDPComs(object):
                     gyrX = struct.unpack("b", data[x * 6 + 11])
                     gyrY = struct.unpack("b", data[x * 6 + 12])
                     gyrZ = struct.unpack("b", data[x * 6 + 13])
-                    x = x + 1
-
-                    # print "sampNo:", x, "AccX:", accX[0]*2, " AccY:", accY[0]*2, " AccZ:", accZ[0]*2, " gyrX:", gyrX[0]*2, \
-                    # " gyrY:", gyrY[0]*2, " gyrZ:", gyrZ[0]*2
+                    x += 1
 
                     # save to CSV file
-                    if ID[0] < NUMBER_OF_NODES:
-                        self.outputFiles[ID[0]].write(
-                            str(ID[0]) + ',' + str(timeStamp[0]) + ',' + str(packetNumber[0]) + ',' +
+                    if id[0] < NUMBER_OF_NODES:
+                        self.outputFiles[id[0]].write(
+                            str(id[0]) + ',' + str(time_stamp[0]) + ',' + str(packet_number[0]) + ',' +
                             str(x) + ','
                             + str(accX[0] * 2) + ',' + str(accY[0] * 2) + ',' + str(accZ[0] * 2) + ','
                             + str(gyrX[0] * 2) + ',' + str(gyrY[0] * 2) + ',' + str(gyrZ[0] * 2) + '\n')
@@ -112,17 +109,12 @@ class UDPComs(object):
             except socket.timeout:
                 print "timeout on data reception"
                 continue
-        for f in self.outputFiles:
-            f.close()
-
-        self.sock.close()
 
     def udp_send_thread(self):
         while self.isRunning:
             timestamp = int(time.time())
             print "Sending timesync packet with UTC[s]:", timestamp, "Localtime:", time.strftime("%Y-%m-%d %H:%M:%S")
 
-            # send UDP packet to nodes - Replace addresses with your sensortag routing address (e.g. aaaa::<sensortag ID>)
             for ip in ["aaaa::212:4b00:c68:2d83", "aaaa::212:4b00:7b5:5c80",
                        "aaaa::212:4b00:7b5:4e06", "aaaa::212:4b00:799:af04",
                        "aaaa::212:4b00:799:dd80", "aaaa::212:4b00:7b5:5601"]:
@@ -134,9 +126,13 @@ class UDPComs(object):
             time.sleep(5)
 
     def close(self):
-
         print "Keyboard interrupt received. Exiting."
         self.isRunning = False
+        self.t2.join()
+        self.t1.join()
+        for f in self.outputFiles:
+            f.close()
+        self.sock.close()
 
 
 ####################################graphing###########################
@@ -232,24 +228,20 @@ class GraphFrame(wx.Frame):
         """ Redraws the plot
         """
 
-        xmax = len(self.data_temp) if len(self.data_temp) > 200 else 200
+        xmax = len(self.plots['temp'].data) if len(self.plots['temp'].data) > 200 else 200
         xmin = xmax - 200
 
-        ymin = round(min(self.data_temp), 0) - 1
-        ymax = round(max(self.data_temp), 0) + 1
+        ymin = round(min(self.plots['temp'].data), 0) - 1
+        ymax = round(max(self.plots['temp'].data), 0) + 1
 
         self.plots['temp'].axes.set_xbound(lower=xmin, upper=xmax)
-        self.plots['temp'].axes.set_7bound(lower=ymin, upper=ymax)
-        self.plots['temp'].grid(True, color='gray')
+        self.plots['temp'].axes.set_ybound(lower=ymin, upper=ymax)
+        self.plots['temp'].axes.grid(True, color='gray')
 
-        self.axes_temp.set_xbound(lower=xmin, upper=xmax)
-        self.axes_temp.set_ybound(lower=ymin, upper=ymax)
-
-        self.axes_temp.grid(True, color='gray')
         pylab.setp(self.plots['temp'].axes.get_xticklabels(), visible=True)
 
-        self.plots['temp'].plot.set_xdata(np.arange(len(self.data_temp)))
-        self.plots['temp'].plot.set_ydata(np.array(self.data_temp))
+        self.plots['temp'].plot.set_xdata(np.arange(len(self.plots['temp'].data)))
+        self.plots['temp'].plot.set_ydata(np.array(self.plots['temp'].data))
 
         xmax = len(self.data_pres) if len(self.data_pres) > 200 else 200
         xmin = xmax - 200
