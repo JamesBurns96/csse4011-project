@@ -84,7 +84,7 @@
 #define UIP_CONF_ROUTER 1
 
 
-#define TAG_ID 0
+#define TAG_ID 1
 
 /*---------------------------------------------------------------------------*/
 
@@ -165,21 +165,24 @@ tcpip_handler(void)
       tcpPayload.timeStamp = UTCTime;
       //tcpPayload.packetNumber = 0;
 
-      udp_send_data();
+      //udp_send_data();
+      PRINT6ADDR(&UIP_IP_BUF->srcipaddr);
+
+      uip_ipaddr_copy(&server_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
     }
 }
 /*---------------------------------------------------------------------------*/
 static void
 payload_print(void)
 {
-    printf("xAcc: %d, yAcc: %d, zAcc: %d, xGyro: %d, yGyro: %d, zGyro: %d\n\r",
+    /*printf("xAcc: %d, yAcc: %d, zAcc: %d, xGyro: %d, yGyro: %d, zGyro: %d\n\r",
         tcpPayload.data[payloadIndex].xAcc, tcpPayload.data[payloadIndex].yAcc,
         tcpPayload.data[payloadIndex].zAcc,
 //        (int)((1.0 * tcpPayload.data[payloadIndex].xGyro) / (65536/500)),
 //        (int)((1.0 * tcpPayload.data[payloadIndex].yGyro) / (65536/500)),
 //        (int)((1.0 * tcpPayload.data[payloadIndex].zGyro) / (65536/500)));
         tcpPayload.data[payloadIndex].xGyro, tcpPayload.data[payloadIndex].yGyro,
-        tcpPayload.data[payloadIndex].zGyro);
+        tcpPayload.data[payloadIndex].zGyro);*/
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -324,6 +327,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
         etimer_reset(&buzz);
         
       } else if (data == &timeSyncTimer) {
+        leds_toggle(LEDS_RED);
         timeStamp++;
         tcpPayload.timeStamp = timeStamp;
         etimer_reset(&timeSyncTimer);
