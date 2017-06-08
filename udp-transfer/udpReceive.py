@@ -4,6 +4,7 @@ import socket
 import datetime
 import struct
 from threading import Thread
+import traceback
 
 import wx
 import time
@@ -105,8 +106,6 @@ class UDPComs(object):
                             + str(accX[0] * 2) + ',' + str(accY[0] * 2) + ',' + str(accZ[0] * 2) + ','
                             + str(gyrX[0] * 2) + ',' + str(gyrY[0] * 2) + ',' + str(gyrZ[0] * 2) + '\n')
 
-                    # update plot
-                    # if (id[0] != 6):
                     if isinstance(self.graph, GraphFrame):
                         (x, y, z) = (float(gyrX[0] * 2), float(gyrY[0] * 2), float(gyrZ[0] * 2))
                         self.graph.update_data('t' + str(id[0]) + '-gyro-x', x)
@@ -146,7 +145,8 @@ class UDPComs(object):
         while self.isRunning:
             try:
                 timestamp = int(time.time())
-                print "Sending timesync packet with UTC[s]:", timestamp, "Localtime:", time.strftime("%Y-%m-%d %H:%M:%S")
+                print "Sending timesync packet with UTC[s]: {0}, Localtime: {1}".\
+                    format(timestamp, time.strftime("%Y-%m-%d %H:%M:%S"))
 
                 for ip in ["aaaa::212:4b00:c68:2d83", "aaaa::212:4b00:7b5:5c80",
                            "aaaa::212:4b00:7b5:4e06", "aaaa::212:4b00:799:af04",
@@ -154,8 +154,14 @@ class UDPComs(object):
                            "aaaa::212:4b00:799:a402"]:
                     self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
                     time.sleep(1)
-            except:
+
+                    if not self.isRunning:
+                        break
+            except socket.error:
+                print 'caught socket.error'
+                traceback.print_exc()
                 self.isRunning = False
+
 
     def close(self):
         print "Keyboard interrupt received. Exiting."
@@ -190,12 +196,13 @@ class GraphFrame(wx.Frame):
         # handle window close event
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
-        # set data source
-        self.source = UDPComs(self)
-
+        # creat plot objects to store data
         self.plots = dict()
         for key in self.PLOT_KEYS:
             self.plots[key] = Plot()
+
+        # set data source
+        self.source = UDPComs(self)
 
         self.panel = wx.Panel(self, 1)
 
@@ -268,6 +275,7 @@ class GraphFrame(wx.Frame):
             time.sleep(2)
 
     def on_exit(self, event):
+        print 'quitting'
         self.source.close()
         self.is_running = False
         self.update_thread.join()
@@ -276,5 +284,6 @@ class GraphFrame(wx.Frame):
 if __name__ == '__main__':
     app = wx.App(False)
     app.frame = GraphFrame()
+    app.frame.Maximize()
     app.frame.Show()
     app.MainLoop()
