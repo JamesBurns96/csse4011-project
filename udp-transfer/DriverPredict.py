@@ -2,7 +2,7 @@ import csv
 import numpy as np
 
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split, GridSearchCV
 
 
@@ -54,10 +54,14 @@ class DriverPredictor(object):
         bad_positives = float(false_positives) / (true_positives + false_positives)
         bad_negatives = float(false_negatives) / (true_negatives + false_negatives)
 
-        print 'true positives: ', true_positives
-        print 'true negatives: ', true_negatives
-        print 'bad positives: ', bad_positives
-        print 'bad negatives: ', bad_negatives
+        print 'true dan: ', true_positives
+        print 'true james: ', true_negatives
+        print 'bad dan: ', bad_positives
+        print 'bad james: ', bad_negatives
+
+        y_pred = self.clf.predict(X_test)
+        cm = confusion_matrix(y_test, y_pred)
+        print cm
 
     def predict(self, X):
         if self.clf is None:
