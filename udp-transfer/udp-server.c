@@ -44,6 +44,10 @@
 #include "sensortag/cc2650/board.h"
 #include "lib/cc26xxware/driverlib/gpio.h"
 
+#define DEBUG DEBUG_PRINT
+#include "net/ip/uip-debug.h"
+
+
 /*-COMPILATION_CONFIG_OPTIONS------------------------------------------------*/
 // Toggles which processes are enabled
 #define ACCEL_ENABLED                       1
@@ -84,7 +88,7 @@
 #define UIP_CONF_ROUTER 1
 
 
-#define TAG_ID 1
+#define TAG_ID 6
 
 /*---------------------------------------------------------------------------*/
 
@@ -136,6 +140,7 @@ static uint8_t payloadIndex = 0;
 static uint8_t count = 0;
 int secondTimer = 0;
 int sampleCounter = 0;
+uint8_t buttonPressed = 0;
 
 /*---------------------------------------------------------------------------*/
 //PROCESS(buzzer_process, "buzzer process");
@@ -218,8 +223,12 @@ get_mpu_reading()
     tcpPayload.data[payloadIndex].zAcc
             = (int8_t)mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_ACC_Z);
             */
+#if TAG_ID == 6
+    tcpPayload.data[payloadIndex].xGyro = !!button_left_sensor.value(BUTTON_SENSOR_VALUE_STATE);
+#else           
     tcpPayload.data[payloadIndex].xGyro
             = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_X) / 200);
+#endif            
     tcpPayload.data[payloadIndex].yGyro
             = (int8_t)(mpu_9250_sensor.value(MPU_9250_SENSOR_TYPE_GYRO_Y) / 200);
     tcpPayload.data[payloadIndex].zGyro
@@ -318,9 +327,7 @@ PROCESS_THREAD(udp_server_process, ev, data)
 	  //Wait for tcipip event to occur
     if(ev == tcpip_event) {
       tcpip_handler();
-    }
-    if(ev == PROCESS_EVENT_TIMER) {
-
+    } else if(ev == PROCESS_EVENT_TIMER) {
 			if(data == &buzz) {
         
         //udp_send_data2();     

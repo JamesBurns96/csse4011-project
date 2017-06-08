@@ -20,7 +20,7 @@ import pylab
 # runtime variables
 UDP_TIMESYNC_PORT = 4003  # node listens for timesync packets on port 4003
 UDP_REPLY_PORT = 7005  # node listens for reply packets on port 7005
-NUMBER_OF_NODES = 6
+NUMBER_OF_NODES = 7
 
 samplesPerPacket = 20
 packetOffset = 3
@@ -46,7 +46,7 @@ class UDPComs(object):
 
         # CSV logging variables
         self.outputFiles = []
-        self.tagTypes = ["rigid", "acc", "brake", "clutch", "gear", "steer"]
+        self.tagTypes = ["rigid", "acc", "brake", "clutch", "gear", "steer", "button"]
         # tags ID correspond to device locations as follows
         # 0 = rigid body, 1 = accelerometer, 2 = brake, 3 = clutch
         # 4 = gear stick. 5 = steering wheel
@@ -78,17 +78,23 @@ class UDPComs(object):
                 packet_number = struct.unpack("H", data[2:4])
                 time_stamp = struct.unpack("I", data[4:8])
 
-                # BUG:, gyro values are wrong, not sure why
                 utc = datetime.datetime.fromtimestamp(time_stamp[0])
                 print "-------------------------------NEW PACKET----------------------------"
                 print " ID", id[0], " UTC(s)", time_stamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
                     "packetNumber:", packet_number[0]
                 x = 0
+
+                
+
                 while (x < samplesPerPacket):
                     accX = struct.unpack("b", data[x * 6 + 8])
                     accY = struct.unpack("b", data[x * 6 + 9])
                     accZ = struct.unpack("b", data[x * 6 + 10])
-                    gyrX = struct.unpack("b", data[x * 6 + 11])
+                    if (id[0] == 6):
+                        gyrX = struct.unpack("b", data[x * 6 + 11])
+                        print "buttonPressed:", gyrX[0]
+                    else:
+                        gyrX = struct.unpack("b", data[x * 6 + 11])
                     gyrY = struct.unpack("b", data[x * 6 + 12])
                     gyrZ = struct.unpack("b", data[x * 6 + 13])
                     x += 1
@@ -102,11 +108,12 @@ class UDPComs(object):
                             + str(gyrX[0] * 2) + ',' + str(gyrY[0] * 2) + ',' + str(gyrZ[0] * 2) + '\n')
 
                     # update plot
-                    if isinstance(self.graph, GraphFrame):
-                        self.graph.update_data('t' + str(id[0]) + '-ax', float(gyrX[0] * 2))
-                        self.graph.update_data('t' + str(id[0]) + '-ay', float(gyrY[0] * 2))
-                        self.graph.update_data('t' + str(id[0]) + '-az', float(gyrZ[0] * 2))
-                        wx.CallAfter(self.graph.draw_plot)
+                    if (id[0] != 6):
+                        if isinstance(self.graph, GraphFrame):
+                            self.graph.update_data('t' + str(id[0]) + '-ax', float(gyrX[0] * 2))
+                            self.graph.update_data('t' + str(id[0]) + '-ay', float(gyrY[0] * 2))
+                            self.graph.update_data('t' + str(id[0]) + '-az', float(gyrZ[0] * 2))
+                            wx.CallAfter(self.graph.draw_plot)
 
             except socket.timeout:
                 print "timeout on data reception"
@@ -119,13 +126,14 @@ class UDPComs(object):
 
             for ip in ["aaaa::212:4b00:c68:2d83", "aaaa::212:4b00:7b5:5c80",
                        "aaaa::212:4b00:7b5:4e06", "aaaa::212:4b00:799:af04",
-                       "aaaa::212:4b00:799:dd80", "aaaa::212:4b00:7b5:5601"]:
+                       "aaaa::212:4b00:799:dd80", "aaaa::212:4b00:7b5:5601",
+                       "aaaa::212:4b00:799:a402"]:
                 self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
                 time.sleep(1)
 
             # TODO fuck this off
             # sleep for 5 seconds
-            time.sleep(5)
+            time.sleep(4)
 
     def close(self):
         print "Keyboard interrupt received. Exiting."
@@ -188,7 +196,7 @@ class GraphFrame(wx.Frame):
         assert(plot_rows * plot_cols == self.PLOT_COUNT)
         for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
             self.plots[key].axes = self.fig.add_subplot(plot_rows, plot_cols, idx+1)
-            self.plots[key].axes.set_facecolor('black')
+            #self.plots[key].axes.set_facecolor('black')
             self.plots[key].axes.set_title(key, size=12)
 
             pylab.setp(self.plots[key].axes.get_xticklabels(), fontsize=8)
