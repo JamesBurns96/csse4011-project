@@ -47,6 +47,7 @@ def load_data(directory):
             raw_line.append(dat.get(p + '-' + s, NO_DATA))
 
         data_raw.append(raw_line)
+
     return np.asarray(data_raw)
 
 
@@ -78,6 +79,11 @@ class PedalDetector(object):
         y = [x[9] / 2. for x in valid_data]
 
         X_test, X_train, y_test, y_train = train_test_split(X, y, test_size=0.9)
+
+
+        with open('interpreted.csv', 'w') as f:
+            f.writelines([','.join([str(x[0]), str(x[1]), str(x[2]), str(y)])+'\n' for (x, y) in zip(X, y)])
+
 
         self.clf = SVC(kernel='linear', C=0.01)
         self.clf.fit(X_train, y_train)
