@@ -40,18 +40,23 @@ class PedalTracker(object):
         self.count = 0
 
     def record_high(self):
-        self.time_at_last_rise = time.time()
+        t = time.time()
+        if self.time_at_last_rise - t > 0.2:
+            self.time_at_last_rise = time.time()
+        else:
+            return
+
         if not self.risen:
             self.count += 1
         self.risen = True
 
     def record_low(self):
         t = time.time()
-        dt = (t - self.time_at_last_rise).milliseconds()/1000.
+        dt = (t - self.time_at_last_rise)
         self.last_times.append(dt)
         self.risen = False
 
-        return [np.mean(self.last_times), self.count/((t - self.start_time).milliseconds())]
+        return [np.mean(self.last_times), self.count/((t - self.start_time))]
 
 
 class UDPComs(object):
@@ -161,10 +166,12 @@ class UDPComs(object):
                             self.graph.update_data('t6-filt-x', pred)
 
                         if pred is not None:
-                            if pred[0] < -0.5:
-                                self.trackers[id[0]].record_low()
-                            elif pred[0] > 0.5:
-                                [avg, rate] = self.trackers[id[0]].record_high()
+                            if pred[0] > 0.5:
+                                self.trackers[id[0]].record_high()
+                            elif pred[0] < -0.5:
+                                i = id[0]
+                                print self.trackers
+                                [avg, rate] = self.trackers[i].record_low()
                                 print "Average time on pedal {0}: {1}".format(id[0], avg)
                                 print "Pedal {0} rate: {1}".format(id[0], rate)
 
