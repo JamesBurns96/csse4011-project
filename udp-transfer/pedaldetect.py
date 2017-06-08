@@ -83,18 +83,50 @@ class PedalDetector(object):
         self.clf.fit(X_train, y_train)
 
         def compute_accuracy(data, target):
-            y = self.predict(data)
+            y = self.clf.predict(data)
             score = accuracy_score(target, y)
             return score
 
         print "- Training set", compute_accuracy(X_train, y_train)
         print "- Testing set", compute_accuracy(X_test, y_test)
 
+        true_positives = 0
+        false_positives = 0
+        true_negatives = 0
+        false_negatives = 0
+        for (r, p) in zip(y_test, self.predict(X_test)):
+            if (r, p) == (0, 0):
+                true_negatives += 1
+            elif (r, p) == (1, 1):
+                true_positives += 1
+            elif (r, p) == (0, 1):
+                false_positives += 1
+            elif (r, p) == (1, 0):
+                false_negatives += 1
+
+        # bad_positives = float(false_positives) / (true_positives + false_positives)
+        bad_negatives = float(false_negatives) / (true_negatives + false_negatives)
+
+        # print 'bad positives: ', bad_positives
+        print 'bad negatives: ', bad_negatives
+
     def predict(self, X):
         if self.clf is None:
-            self.train()
+            raise ValueError
 
-        return self.clf.predict(X)
+        pred = []
+        for x in X:
+            if np.sum(x) > 50:
+                pred.append(1)
+            elif np.sum(x) < -50:
+                pred.append(-1)
+            else:
+                pred.append(0)
+
+        return pred
+        # return np.sign(X) * (np.abs(np.sum(X)) > 100)
+        # return self.clf.predict(X)
+        # return X
 
 
 if __name__ == '__main__':

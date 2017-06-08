@@ -17,6 +17,8 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
 import numpy as np
 import pylab
 
+import pedaldetect
+
 # runtime variables
 UDP_TIMESYNC_PORT = 4003  # node listens for timesync packets on port 4003
 UDP_REPLY_PORT = 7005  # node listens for reply packets on port 7005
@@ -24,7 +26,6 @@ NUMBER_OF_NODES = 7
 
 samplesPerPacket = 20
 packetOffset = 3
-x = 0
 firstPacketNumber = 0
 secondPacketNumber = 0
 
@@ -57,6 +58,9 @@ class UDPComs(object):
                                       + "accX" + ',' + "accY" + ',' + "accZ" + ','
                                       + "gyrX" + ',' + "gyrY" + ',' + "gyrZ" + '\n')
 
+        self.pd = pedaldetect.PedalDetector()
+        self.pd.train()
+
         # start UDP listener thread
         self.t1 = Thread(target=self.udp_listen_thread)
         self.t1.start()
@@ -82,22 +86,15 @@ class UDPComs(object):
                 print "-------------------------------NEW PACKET----------------------------"
                 print " ID", id[0], " UTC(s)", time_stamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
                     "packetNumber:", packet_number[0]
-                x = 0
 
-                
-
-                while (x < samplesPerPacket):
+                for x in range(samplesPerPacket):
                     accX = struct.unpack("b", data[x * 6 + 8])
                     accY = struct.unpack("b", data[x * 6 + 9])
                     accZ = struct.unpack("b", data[x * 6 + 10])
-                    if (id[0] == 6):
-                        gyrX = struct.unpack("b", data[x * 6 + 11])
-                        print "buttonPressed:", gyrX[0]
-                    else:
-                        gyrX = struct.unpack("b", data[x * 6 + 11])
+
+                    gyrX = struct.unpack("b", data[x * 6 + 11])
                     gyrY = struct.unpack("b", data[x * 6 + 12])
                     gyrZ = struct.unpack("b", data[x * 6 + 13])
-                    x += 1
 
                     # save to CSV file
                     if id[0] < NUMBER_OF_NODES:
@@ -108,12 +105,16 @@ class UDPComs(object):
                             + str(gyrX[0] * 2) + ',' + str(gyrY[0] * 2) + ',' + str(gyrZ[0] * 2) + '\n')
 
                     # update plot
-                    if (id[0] != 6):
-                        if isinstance(self.graph, GraphFrame):
-                            self.graph.update_data('t' + str(id[0]) + '-ax', float(gyrX[0] * 2))
-                            self.graph.update_data('t' + str(id[0]) + '-ay', float(gyrY[0] * 2))
-                            self.graph.update_data('t' + str(id[0]) + '-az', float(gyrZ[0] * 2))
-                            wx.CallAfter(self.graph.draw_plot)
+                    # if (id[0] != 6):
+                    if isinstance(self.graph, GraphFrame):
+                        (x, y, z) = (float(gyrX[0] * 2), float(gyrY[0] * 2), float(gyrZ[0] * 2))
+                        self.graph.update_data('t' + str(id[0]) + '-ax', x)
+                        self.graph.update_data('t' + str(id[0]) + '-ay', y)
+                        self.graph.update_data('t' + str(id[0]) + '-az', z)
+
+                        self.graph.update_data('t' + str(id[0]) + '-filtx', self.pd.predict(np.array([x, y, z]).reshape(1, -1)))
+
+                wx.CallAfter(self.graph.draw_plot)
 
             except socket.timeout:
                 print "timeout on data reception"
@@ -130,10 +131,6 @@ class UDPComs(object):
                        "aaaa::212:4b00:799:a402"]:
                 self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
                 time.sleep(1)
-
-            # TODO fuck this off
-            # sleep for 5 seconds
-            time.sleep(4)
 
     def close(self):
         print "Keyboard interrupt received. Exiting."
@@ -157,12 +154,10 @@ class GraphFrame(wx.Frame):
     """ The main frame of the application
     """
     title = 'Demo'
-    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax',
-                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay',
-                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az',
-                 't0-filtx', 't1-filtx','t2-filtx', 'tilt3-filtx', 't4-filtx', 't5-filtx',
-                 't0-filty', 't1-filty','t2-filty', 'tilt3-filty', 't4-filty', 't5-filty',
-                 't0-filtz', 't1-filtz','t2-filtz', 'tilt3-filtz', 't4-filtz', 't5-filtz']
+    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax', 't6-ax',
+                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay', 't6-ay',
+                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az', 't6-az',
+                 't0-filtx', 't1-filtx','t2-filtx', 't3-filtx', 't4-filtx', 't5-filtx', 't6-filtx']
     PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
@@ -191,11 +186,10 @@ class GraphFrame(wx.Frame):
 
     def init_plot(self):
         self.fig = Figure((6.0, 3.0), dpi=100)
-        plot_rows = 6
-        plot_cols = 6
-        assert(plot_rows * plot_cols == self.PLOT_COUNT)
+        plot_rows = 4
+        assert(plot_rows * NUMBER_OF_NODES == self.PLOT_COUNT)
         for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
-            self.plots[key].axes = self.fig.add_subplot(plot_rows, plot_cols, idx+1)
+            self.plots[key].axes = self.fig.add_subplot(plot_rows, NUMBER_OF_NODES, idx+1)
             #self.plots[key].axes.set_facecolor('black')
             self.plots[key].axes.set_title(key, size=12)
 
@@ -220,6 +214,14 @@ class GraphFrame(wx.Frame):
             # ymax = round(max(self.plots[key].data), 0) + 1
             ymin = -250
             ymax = 250
+
+            if 'filt' in key:
+                ymin = -1.5
+                ymax = 1.5
+
+            if key == 't6-ax':
+                ymin = -0.5
+                ymax = 2.5
 
             self.plots[key].axes.set_xbound(lower=xmin, upper=xmax)
             self.plots[key].axes.set_ybound(lower=ymin, upper=ymax)
