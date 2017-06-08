@@ -201,7 +201,7 @@ class UDPComs(object):
                                 confidence = 20 * np.abs(0.5 - np.mean(self.last_drivers))
 
                                 ServerInterface.update_server_driver(driver_name, confidence)
-                                print 'I THINK ', driver_name, ' IS DRIVING THE CAR'
+                                print 'I THINK ', driver_name, ' IS DRIVING THE CAR ', confidence
 
                 # wx.CallAfter(self.graph.draw_plot)
 
