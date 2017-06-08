@@ -19,6 +19,8 @@ import numpy as np
 import pylab
 
 import pedaldetect
+import DriverPredict
+import ServerInterface
 
 # runtime variables
 UDP_TIMESYNC_PORT = 4003  # node listens for timesync packets on port 4003
@@ -93,6 +95,10 @@ class UDPComs(object):
         # tags ID correspond to device locations as follows
         # 0 = rigid body, 1 = accelerometer, 2 = brake, 3 = clutch
         # 4 = gear stick. 5 = steering wheel
+
+        self.dp = DriverPredict.DriverPredictor()
+        self.dp.train()
+        self.last_drivers = collections.deque(maxlen=1000)
 
         self.trackers = []
         for i in range(NUMBER_OF_NODES):
@@ -186,6 +192,16 @@ class UDPComs(object):
                                 print "Average time on pedal {0}: {1}".format(id[0], avg)
                                 print "Pedal {0} rate: {1}".format(id[0], rate)
 
+                                ml_x = [i, avg, rate, dt]
+                                y = self.dp.predict(ml_x)
+                                DRIVER_NAMES = ['James', 'Dan']
+                                driver_name = DRIVER_NAMES[y]
+
+                                self.last_drivers.append(y)
+                                confidence = 20 * np.abs(0.5 - np.mean(self.last_drivers))
+
+                                ServerInterface.update_server_driver(driver_name, confidence)
+                                print 'I THINK ', driver_name, ' IS DRIVING THE CAR'
 
                 # wx.CallAfter(self.graph.draw_plot)
 

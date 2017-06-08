@@ -22,9 +22,9 @@ class DriverPredictor(object):
         assert(len(all_x) == len(all_y))
         assert(len(all_x) > 0)
 
-        X_test, X_train, y_test, y_train = train_test_split(all_x, all_y, test_size=0.6)
+        X_test, X_train, y_test, y_train = train_test_split(all_x, all_y, test_size=0.8)
 
-        self.clf = SVC(kernel='linear', C=0.01)
+        self.clf = SVC(kernel='rbf', C=0.1)
         self.clf.fit(X_train, y_train)
 
         def compute_accuracy(data, target):
@@ -49,9 +49,13 @@ class DriverPredictor(object):
             elif (r, p) == (1, 0):
                 false_negatives += 1
 
+        true_positives = float(true_positives) / (true_positives + false_positives)
+        true_negatives = float(true_negatives) / (true_negatives + false_negatives)
         bad_positives = float(false_positives) / (true_positives + false_positives)
         bad_negatives = float(false_negatives) / (true_negatives + false_negatives)
 
+        print 'true positives: ', true_positives
+        print 'true negatives: ', true_negatives
         print 'bad positives: ', bad_positives
         print 'bad negatives: ', bad_negatives
 
@@ -59,19 +63,7 @@ class DriverPredictor(object):
         if self.clf is None:
             raise ValueError
 
-        pred = []
-        for x in X:
-            if np.sum(x) > 50:
-                pred.append(1)
-            elif np.sum(x) < -50:
-                pred.append(-1)
-            else:
-                pred.append(0)
-
-        return pred
-        # return np.sign(X) * (np.abs(np.sum(X)) > 100)
-        # return self.clf.predict(X)
-        # return X
+        return self.clf.predict(X)
 
 
 def predict_from_threshold(X, t_low, t_high):
