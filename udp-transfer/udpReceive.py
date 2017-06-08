@@ -115,17 +115,17 @@ class UDPComs(object):
                         if id[0] == 0:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
                             self.graph.update_data('t0-filt-x', pred)
-                        if id[0] == 1:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                        if id[0] == 1:#acc
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -10, 10)
                             self.graph.update_data('t1-filt-x', pred)
-                        if id[0] == 2:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                        if id[0] == 2:#brake
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -7, 7)
                             self.graph.update_data('t2-filt-x', pred)
-                        if id[0] == 3:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                        if id[0] == 3:#cltch
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -30, 40)
                             self.graph.update_data('t3-filt-x', pred)
-                        if id[0] == 4:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -150, 150)
+                        if id[0] == 4:#gear stick
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
                             self.graph.update_data('t4-filt-x', pred)
                         if id[0] == 5:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
