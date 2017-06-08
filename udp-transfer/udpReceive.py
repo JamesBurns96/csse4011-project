@@ -23,7 +23,7 @@ import pedaldetect
 # runtime variables
 UDP_TIMESYNC_PORT = 4003  # node listens for timesync packets on port 4003
 UDP_REPLY_PORT = 7005  # node listens for reply packets on port 7005
-NUMBER_OF_NODES = 7
+NUMBER_OF_NODES = 6
 
 samplesPerPacket = 20
 packetOffset = 3
@@ -39,7 +39,7 @@ class PedalTracker(object):
         self.last_times = collections.deque(maxlen=100)
         self.risen = False
         self.count = 0
-        self.file = open(filename, 'w')
+        self.file = open(filename, 'w+')
 
     def record_high(self):
         t = time.time()
@@ -172,11 +172,8 @@ class UDPComs(object):
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
                             self.graph.update_data('t4-filt-x', pred)
                         if id[0] == 5:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            pred = pedaldetect.predict_from_threshold([z], -120, 120)
                             self.graph.update_data('t5-filt-x', pred)
-                        if id[0] == 6:
-                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t6-filt-x', pred)
 
                         if pred is not None:
                             if pred[0] > 0.5:
@@ -240,10 +237,17 @@ class GraphFrame(wx.Frame):
     """ The main frame of the application
     """
     title = 'Gyroscope and Filter Monitor'
-    PLOT_KEYS = ['t0-gyro-x', 't1-gyro-x', 't2-gyro-x', 't3-gyro-x', 't4-gyro-x', 't5-gyro-x', 't6-gyro-x',
-                 't0-gyro-y', 't1-gyro-y', 't2-gyro-y', 't3-gyro-y', 't4-gyro-y', 't5-gyro-y', 't6-gyro-y',
-                 't0-gyro-z', 't1-gyro-z', 't2-gyro-z', 't3-gyro-z', 't4-gyro-z', 't5-gyro-z', 't6-gyro-z',
-                 't0-filt-x', 't1-filt-x', 't2-filt-x', 't3-filt-x', 't4-filt-x', 't5-filt-x', 't6-filt-x']
+    PLOT_KEYS = ['t0-gyro-x', 't1-gyro-x', 't2-gyro-x', 't3-gyro-x', 't4-gyro-x', 't5-gyro-x',
+                 't0-gyro-y', 't1-gyro-y', 't2-gyro-y', 't3-gyro-y', 't4-gyro-y', 't5-gyro-y',
+                 't0-gyro-z', 't1-gyro-z', 't2-gyro-z', 't3-gyro-z', 't4-gyro-z', 't5-gyro-z',
+                 't0-filt-x', 't1-filt-x', 't2-filt-x', 't3-filt-x', 't4-filt-x', 't5-filt-x']
+    # 0 = rigid body, 1 = accelerometer, 2 = brake, 3 = clutch
+    # 4 = gear stick. 5 = steering wheel
+    PLOT_NAMES = ['rigid x', 'accelerator x', 'brake x', 'clutch x', 'shifter x', 'wheel x',
+                  'rigid y', 'accelerator y', 'brake y', 'clutch y', 'shifter y', 'wheel y',
+                  'rigid z', 'accelerator z', 'brake z', 'clutch z', 'shifter z', 'wheel z',
+                  'rigid', 'accelerator', 'brake', 'clutch', 'shifter', 'wheel']
+
     PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
@@ -279,10 +283,9 @@ class GraphFrame(wx.Frame):
         self.fig = Figure()
         plot_rows = 4
         assert(plot_rows * NUMBER_OF_NODES == self.PLOT_COUNT)
-        for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
+        for (key, idx, name) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT), self.PLOT_NAMES):
             self.plots[key].axes = self.fig.add_subplot(plot_rows, NUMBER_OF_NODES, idx+1)
-            #self.plots[key].axes.set_facecolor('black')
-            self.plots[key].axes.set_title(key, size=12)
+            self.plots[key].axes.set_title(name, size=12)
 
             pylab.setp(self.plots[key].axes.get_xticklabels(), fontsize=8)
             pylab.setp(self.plots[key].axes.get_yticklabels(), fontsize=8)
@@ -307,10 +310,6 @@ class GraphFrame(wx.Frame):
             if 'filt' in key:
                 ymin = -1.5
                 ymax = 1.5
-
-            if key == 't6-gyro-x':
-                ymin = -0.5
-                ymax = 2.5
 
             self.plots[key].axes.set_xbound(lower=xmin, upper=xmax)
             self.plots[key].axes.set_ybound(lower=ymin, upper=ymax)
