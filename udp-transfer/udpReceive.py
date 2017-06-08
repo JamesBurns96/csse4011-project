@@ -109,33 +109,33 @@ class UDPComs(object):
                     # if (id[0] != 6):
                     if isinstance(self.graph, GraphFrame):
                         (x, y, z) = (float(gyrX[0] * 2), float(gyrY[0] * 2), float(gyrZ[0] * 2))
-                        self.graph.update_data('t' + str(id[0]) + '-ax', x)
-                        self.graph.update_data('t' + str(id[0]) + '-ay', y)
-                        self.graph.update_data('t' + str(id[0]) + '-az', z)
+                        self.graph.update_data('t' + str(id[0]) + '-gyro-x', x)
+                        self.graph.update_data('t' + str(id[0]) + '-gyro-y', y)
+                        self.graph.update_data('t' + str(id[0]) + '-gyro-z', z)
 
                         if id[0] == 0:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t0-filtx', pred)
+                            self.graph.update_data('t0-filt-x', pred)
                         if id[0] == 1:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t1-filtx', pred)
+                            self.graph.update_data('t1-filt-x', pred)
                         if id[0] == 2:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t2-filtx', pred)
+                            self.graph.update_data('t2-filt-x', pred)
                         if id[0] == 3:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t3-filtx', pred)
+                            self.graph.update_data('t3-filt-x', pred)
                         if id[0] == 4:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -150, 150)
-                            self.graph.update_data('t4-filtx', pred)
+                            self.graph.update_data('t4-filt-x', pred)
                         if id[0] == 5:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t5-filtx', pred)
+                            self.graph.update_data('t5-filt-x', pred)
                         if id[0] == 6:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
-                            self.graph.update_data('t6-filtx', pred)
+                            self.graph.update_data('t6-filt-x', pred)
 
-                wx.CallAfter(self.graph.draw_plot)
+                # wx.CallAfter(self.graph.draw_plot)
 
             except socket.timeout:
                 print "timeout on data reception"
@@ -144,15 +144,18 @@ class UDPComs(object):
     def udp_send_thread(self):
         time.sleep(2)
         while self.isRunning:
-            timestamp = int(time.time())
-            print "Sending timesync packet with UTC[s]:", timestamp, "Localtime:", time.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                timestamp = int(time.time())
+                print "Sending timesync packet with UTC[s]:", timestamp, "Localtime:", time.strftime("%Y-%m-%d %H:%M:%S")
 
-            for ip in ["aaaa::212:4b00:c68:2d83", "aaaa::212:4b00:7b5:5c80",
-                       "aaaa::212:4b00:7b5:4e06", "aaaa::212:4b00:799:af04",
-                       "aaaa::212:4b00:799:dd80", "aaaa::212:4b00:7b5:5601",
-                       "aaaa::212:4b00:799:a402"]:
-                self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
-                time.sleep(1)
+                for ip in ["aaaa::212:4b00:c68:2d83", "aaaa::212:4b00:7b5:5c80",
+                           "aaaa::212:4b00:7b5:4e06", "aaaa::212:4b00:799:af04",
+                           "aaaa::212:4b00:799:dd80", "aaaa::212:4b00:7b5:5601",
+                           "aaaa::212:4b00:799:a402"]:
+                    self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
+                    time.sleep(1)
+            except:
+                self.isRunning = False
 
     def close(self):
         print "Keyboard interrupt received. Exiting."
@@ -164,7 +167,6 @@ class UDPComs(object):
         self.sock.close()
 
 
-####################################graphing###########################
 class Plot(object):
     def __init__(self):
         self.data = collections.deque(maxlen=500)
@@ -175,11 +177,11 @@ class Plot(object):
 class GraphFrame(wx.Frame):
     """ The main frame of the application
     """
-    title = 'Demo'
-    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax', 't6-ax',
-                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay', 't6-ay',
-                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az', 't6-az',
-                 't0-filtx', 't1-filtx','t2-filtx', 't3-filtx', 't4-filtx', 't5-filtx', 't6-filtx']
+    title = 'Gyroscope and Filter Monitor'
+    PLOT_KEYS = ['t0-gyro-x', 't1-gyro-x', 't2-gyro-x', 't3-gyro-x', 't4-gyro-x', 't5-gyro-x', 't6-gyro-x',
+                 't0-gyro-y', 't1-gyro-y', 't2-gyro-y', 't3-gyro-y', 't4-gyro-y', 't5-gyro-y', 't6-gyro-y',
+                 't0-gyro-z', 't1-gyro-z', 't2-gyro-z', 't3-gyro-z', 't4-gyro-z', 't5-gyro-z', 't6-gyro-z',
+                 't0-filt-x', 't1-filt-x', 't2-filt-x', 't3-filt-x', 't4-filt-x', 't5-filt-x', 't6-filt-x']
     PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
@@ -207,6 +209,10 @@ class GraphFrame(wx.Frame):
 
         self.panel.SetSizer(self.vbox)
         self.vbox.Fit(self)
+
+        self.is_running = True
+        self.update_thread = Thread(target=self.update_plot_thread)
+        self.update_thread.start()
 
     def init_plot(self):
         self.fig = Figure((6.0, 3.0), dpi=100)
@@ -243,7 +249,7 @@ class GraphFrame(wx.Frame):
                 ymin = -1.5
                 ymax = 1.5
 
-            if key == 't6-ax':
+            if key == 't6-gyro-x':
                 ymin = -0.5
                 ymax = 2.5
 
@@ -258,8 +264,15 @@ class GraphFrame(wx.Frame):
 
         self.canvas.draw()
 
+    def update_plot_thread(self):
+        while self.is_running:
+            self.draw_plot()
+            time.sleep(2)
+
     def on_exit(self, event):
         self.source.close()
+        self.is_running = False
+        self.update_thread.join()
         self.Destroy()
 
 
