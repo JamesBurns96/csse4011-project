@@ -35,28 +35,36 @@ class PedalTracker(object):
     def __init__(self):
         self.start_time = time.time()
         self.time_at_last_rise = time.time()
+        self.time_at_last_fall = time.time()
         self.last_times = collections.deque(maxlen=100)
         self.risen = False
         self.count = 0
 
     def record_high(self):
         t = time.time()
-        if self.time_at_last_rise - t > 0.2:
-            self.time_at_last_rise = time.time()
+        tsl = t - self.time_at_last_rise
+        if  tsl > 0.2:
+            self.time_at_last_rise = t
         else:
             return
 
         if not self.risen:
             self.count += 1
+            
         self.risen = True
 
     def record_low(self):
         t = time.time()
         dt = (t - self.time_at_last_rise)
-        self.last_times.append(dt)
+        if self.risen:
+            self.last_times.append(dt)
+            self.time_at_last_fall = t
         self.risen = False
 
-        return [np.mean(self.last_times), self.count/((t - self.start_time))]
+        if len(self.last_times) == 0:
+            return [0, 0]
+        else:
+            return [np.mean(self.last_times), self.count/((self.time_at_last_fall - self.start_time)), dt]
 
 
 class UDPComs(object):
@@ -171,7 +179,8 @@ class UDPComs(object):
                             elif pred[0] < -0.5:
                                 i = id[0]
                                 print self.trackers
-                                [avg, rate] = self.trackers[i].record_low()
+                                [avg, rate, dt] = self.trackers[i].record_low()
+                                print "Pedal {0} was down for {1}s".format(id[0], dt)
                                 print "Average time on pedal {0}: {1}".format(id[0], avg)
                                 print "Pedal {0} rate: {1}".format(id[0], rate)
 
