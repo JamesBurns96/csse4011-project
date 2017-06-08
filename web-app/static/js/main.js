@@ -23,6 +23,7 @@ $(document).ready(function() {
     setupSensors();
     setupPrediction();
     setupDeviceGyro();
+    setupDeviceSpeed();
 })
 
 /**
@@ -69,13 +70,85 @@ function setupDeviceGyro() {
         data.dataY.html(ry);
         data.dataZ.html(rz);
 
-        updateVectorGraph(data.vectorElement, data.rx, data.ry, data.rz, "device_gyro");
+        updateVectorGraph(data.vectorElement, rx, ry, rz, "device_gyro");
 
         $.get({
             url: "/data/device/gyro/" + rx + "/" + ry + "/" + rz
         }).done(function(data) {
             // Do nothing
         })
+    }
+}
+
+function setupDeviceSpeed() {
+    var lastLong = null;
+    var lastLat = null;
+    var lastTime = null;
+    var speed = null;
+
+    if (navigator.geolocation) {
+        getPosition();
+    }
+
+    function getPosition() {
+        navigator.geolocation.getCurrentPosition(handlePosition, null, {enableHighAccuracy: true});
+
+        setTimeout(getPosition, 250);
+    }
+
+    function handlePosition(pos) {
+        var lat = pos.coords.latitude;
+        var long = pos.coords.longitude;
+        var now = Date.now();
+
+    if (lastLong != null && lastLat != null && lastTime != null && now != lastTime) {
+            var tempSpeed = distance(lat, long, lastLat, lastLong) / ((now - lastTime) / 1000.0);   
+
+            if (tempSpeed != null && !isNaN(tempSpeed)) {
+                speed = tempSpeed / (3600 * 1000);
+                speed = speed * 10000000;
+            }
+        }
+
+        if (speed != null && speed != 0) {
+            var data = sensors["device_speed"];
+
+            data.x.append(new Date().getTime(), speed);
+
+            if (data.x.length > 50) {
+                data.x.shift();
+            }
+
+            data.dataX.html(speed + "km/h");
+
+            updateVectorGraph(data.vectorElement, speed, 0, 0, "device_speed");
+
+            $.get({
+                url: "/data/device/speed/" + speed
+            }).done(function(data) {
+                // Do nothing
+            })
+        }
+
+        lastLong = long;
+        lastLat = lat;
+        lastTime = now;
+    }
+    
+    function distance(lat1, long1, lat2, long2) {
+        if (lat1 == lat2 && long1 == long2) {
+            return null;
+        }
+        var R = 6371000; // metres (Earth radius)
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLon = (long2 - long1) * Math.PI / 180.0;
+        var a = Math.sin(dLat / 2.0) * Math.sin(dLat / 2.0) +
+            Math.cos(lat1 * Math.PI / 180.0) * Math.cos(lat2 * Math.PI / 180.0) *
+            Math.sin(dLon / 2.0) * Math.sin(dLon / 2.0);
+        var c = 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+        var d = R * c;
+        var dist = Math.abs(d);
+        return dist;
     }
 }
 
@@ -122,6 +195,9 @@ function setupSensors() {
 
         createNewSensor("device_gyro");
         configureSensor("device_gyro");
+
+        createNewSensor("device_speed");
+        configureSensor("device_speed");
     })
 }
 
@@ -164,6 +240,10 @@ function configureSensor(sensor) {
         chart = new SmoothieChart({minValue: -180, maxValue: 180});
     }
 
+    if (sensor == "device_speed") {
+        chart = new SmoothieChart({minValue: 0, maxValue: 100});
+    }
+
     chart.addTimeSeries(x, { strokeStyle: 'rgba(0, 255, 0, 1)', fillStyle: 'rgba(0, 255, 0, 0.2)', lineWidth: 3 });
     chart.addTimeSeries(y, { strokeStyle: 'rgba(255, 0, 0, 1)', fillStyle: 'rgba(255, 0, 0, 0.2)', lineWidth: 3 });
     chart.addTimeSeries(z, { strokeStyle: 'rgba(0, 0, 255, 1)', fillStyle: 'rgba(0, 0, 255, 0.2)', lineWidth: 3 });
@@ -182,12 +262,16 @@ function configureSensor(sensor) {
         vectorElement: vectorElement    
     };
 
-    if (sensor == "device_gyro") {
+    if (sensor == "device_gyro" || sensor == "device_speed") {
         // Don't use get requests for the device data
         return;
     }
 
     (function($dataX, $dataY, $dataZ, x, y, z, vectorElement, sensor) {
+        var lastX = null;
+        var lastY = null;
+        var lastZ = null;
+
         function getSensorData() {
             $.get({
                 url: "/data/sensor/" + sensor,
@@ -216,6 +300,10 @@ function configureSensor(sensor) {
                 $dataZ.html(rz);
 
                 updateVectorGraph(vectorElement, rx, ry, rz, sensor);
+
+                lastX = rx;
+                lastY = ry;
+                lastZ = rz;
             })
 
             setTimeout(getSensorData, 1000);
@@ -228,6 +316,15 @@ function configureSensor(sensor) {
 function createVectorGraph(vectorElement, v1, v2, v3, sensor) {
     var min = 0.0;
     var max = 2.0;
+
+    var horizontal = 1;
+    var vertical = 0.5;
+    var distance = 1.5;
+
+    if (sensor == "device_speed") {
+        max = 100.0
+        vertical = 50.0;
+    }
 
     options = {
         zMin: -max,
