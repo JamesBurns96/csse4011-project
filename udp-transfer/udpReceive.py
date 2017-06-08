@@ -24,6 +24,7 @@ NUMBER_OF_NODES = 7
 
 samplesPerPacket = 20
 packetOffset = 3
+x = 0
 firstPacketNumber = 0
 secondPacketNumber = 0
 
@@ -71,47 +72,48 @@ class UDPComs(object):
     def udp_listen_thread(self):
         while self.isRunning:
             try:
-                data, address = self.sock.recvfrom(1024)
+                data, addr = self.sock.recvfrom(1024)
                 start_byte = struct.unpack("B", data[0])
-                packet_id = struct.unpack("B", data[1])
+                id = struct.unpack("B", data[1])
                 packet_number = struct.unpack("H", data[2:4])
                 time_stamp = struct.unpack("I", data[4:8])
 
-                #if start_byte[0] != '(':
-                    #continue
-
-                # BUG:, gyro values are wrong, not sure why
-
                 utc = datetime.datetime.fromtimestamp(time_stamp[0])
                 print "-------------------------------NEW PACKET----------------------------"
-                print " ID", packet_id[0], " UTC(s)", time_stamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
+                print " ID", id[0], " UTC(s)", time_stamp[0], "Localtime:", utc.strftime("%Y-%m-%d %H:%M:%S"), \
                     "packetNumber:", packet_number[0]
+                x = 0
 
-                for x in range(samplesPerPacket):
-                    acc_x = struct.unpack("b", data[x * 6 + 8])
-                    acc_y = struct.unpack("b", data[x * 6 + 9])
-                    acc_z = struct.unpack("b", data[x * 6 + 10])
-                    gyr_x = struct.unpack("b", data[x * 6 + 11])
-                    gyr_y = struct.unpack("b", data[x * 6 + 12])
-                    gyr_z = struct.unpack("b", data[x * 6 + 13])
-                    if packet_id[0] == 6:
-                        print 'button pressed: ', gyr_x[0]
+                
+
+                while (x < samplesPerPacket):
+                    accX = struct.unpack("b", data[x * 6 + 8])
+                    accY = struct.unpack("b", data[x * 6 + 9])
+                    accZ = struct.unpack("b", data[x * 6 + 10])
+                    if (id[0] == 6):
+                        gyrX = struct.unpack("b", data[x * 6 + 11])
+                        print "buttonPressed:", gyrX[0]
+                    else:
+                        gyrX = struct.unpack("b", data[x * 6 + 11])
+                    gyrY = struct.unpack("b", data[x * 6 + 12])
+                    gyrZ = struct.unpack("b", data[x * 6 + 13])
+                    x += 1
 
                     # save to CSV file
-                    if packet_id[0] < NUMBER_OF_NODES:
-                        self.outputFiles[packet_id[0]].write(
-                            str(packet_id[0]) + ',' + str(time_stamp[0]) + ',' + str(packet_number[0]) + ',' +
+                    if id[0] < NUMBER_OF_NODES:
+                        self.outputFiles[id[0]].write(
+                            str(id[0]) + ',' + str(time_stamp[0]) + ',' + str(packet_number[0]) + ',' +
                             str(x) + ','
-                            + str(acc_x[0] * 2) + ',' + str(acc_y[0] * 2) + ',' + str(acc_z[0] * 2) + ','
-                            + str(gyr_x[0] * 2) + ',' + str(gyr_y[0] * 2) + ',' + str(gyr_z[0] * 2) + '\n')
+                            + str(accX[0] * 2) + ',' + str(accY[0] * 2) + ',' + str(accZ[0] * 2) + ','
+                            + str(gyrX[0] * 2) + ',' + str(gyrY[0] * 2) + ',' + str(gyrZ[0] * 2) + '\n')
 
                     # update plot
-                    if isinstance(self.graph, GraphFrame):
-                        self.graph.update_data('t' + str(packet_id[0]) + '-ax', float(gyr_x[0] * 2))
-                        self.graph.update_data('t' + str(packet_id[0]) + '-ay', float(gyr_y[0] * 2))
-                        self.graph.update_data('t' + str(packet_id[0]) + '-az', float(gyr_z[0] * 2))
-
-                wx.CallAfter(self.graph.draw_plot)
+                    if (id[0] != 6):
+                        if isinstance(self.graph, GraphFrame):
+                            self.graph.update_data('t' + str(id[0]) + '-ax', float(gyrX[0] * 2))
+                            self.graph.update_data('t' + str(id[0]) + '-ay', float(gyrY[0] * 2))
+                            self.graph.update_data('t' + str(id[0]) + '-az', float(gyrZ[0] * 2))
+                            wx.CallAfter(self.graph.draw_plot)
 
             except socket.timeout:
                 print "timeout on data reception"
@@ -129,6 +131,10 @@ class UDPComs(object):
                 self.sock.sendto(struct.pack("I", timestamp), (ip, UDP_TIMESYNC_PORT))  # ID n
                 time.sleep(1)
 
+            # TODO fuck this off
+            # sleep for 5 seconds
+            time.sleep(4)
+
     def close(self):
         print "Keyboard interrupt received. Exiting."
         self.isRunning = False
@@ -139,6 +145,7 @@ class UDPComs(object):
         self.sock.close()
 
 
+####################################graphing###########################
 class Plot(object):
     def __init__(self):
         self.data = collections.deque(maxlen=500)
@@ -150,12 +157,12 @@ class GraphFrame(wx.Frame):
     """ The main frame of the application
     """
     title = 'Demo'
-    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax', 't6-ax',
-                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay', 't6-ay',
-                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az', 't6-az',
-                 't0-filt-x', 't1-filt-x', 't2-filt-x', 'tilt3-filt-x', 't4-filt-x', 't5-filt-x', 't6-filt-ax',
-                 't0-filt-y', 't1-filt-y', 't2-filt-y', 'tilt3-filt-y', 't4-filt-y', 't5-filt-y', 't6-filt-ay',
-                 't0-filt-z', 't1-filt-z', 't2-filt-z', 'tilt3-filt-z', 't4-filt-z', 't5-filt-z', 't6-filt-az']
+    PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax',
+                 't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay',
+                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az',
+                 't0-filtx', 't1-filtx','t2-filtx', 'tilt3-filtx', 't4-filtx', 't5-filtx',
+                 't0-filty', 't1-filty','t2-filty', 'tilt3-filty', 't4-filty', 't5-filty',
+                 't0-filtz', 't1-filtz','t2-filtz', 'tilt3-filtz', 't4-filtz', 't5-filtz']
     PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
@@ -182,12 +189,10 @@ class GraphFrame(wx.Frame):
         self.panel.SetSizer(self.vbox)
         self.vbox.Fit(self)
 
-        self.fig = None
-
     def init_plot(self):
         self.fig = Figure((6.0, 3.0), dpi=100)
         plot_rows = 6
-        plot_cols = 7
+        plot_cols = 6
         assert(plot_rows * plot_cols == self.PLOT_COUNT)
         for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
             self.plots[key].axes = self.fig.add_subplot(plot_rows, plot_cols, idx+1)
@@ -211,12 +216,10 @@ class GraphFrame(wx.Frame):
             xmax = len(self.plots[key].data) if len(self.plots[key].data) > 200 else 200
             xmin = xmax - 200
 
+            # ymin = round(min(self.plots[key].data), 0) - 1
+            # ymax = round(max(self.plots[key].data), 0) + 1
             ymin = -250
             ymax = 250
-
-            if key == 't6-ax':
-                ymin = -0.5
-                ymax = 2.5
 
             self.plots[key].axes.set_xbound(lower=xmin, upper=xmax)
             self.plots[key].axes.set_ybound(lower=ymin, upper=ymax)
