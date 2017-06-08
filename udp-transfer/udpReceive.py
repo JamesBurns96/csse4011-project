@@ -42,7 +42,7 @@ class UDPComs(object):
         # generate socket connection
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, 0)
         self.sock.bind(('', 7005))
-        self.sock.settimeout(0.5)
+        self.sock.settimeout(5)
         self.isRunning = True
 
         # CSV logging variables
@@ -74,7 +74,7 @@ class UDPComs(object):
         print "Exit application by pressing (CTRL-C)"
 
     def udp_listen_thread(self):
-        time.sleep(1)
+        # time.sleep(1)
         while self.isRunning:
             try:
                 data, addr = self.sock.recvfrom(1024)
@@ -142,7 +142,7 @@ class UDPComs(object):
                 continue
 
     def udp_send_thread(self):
-        time.sleep(2)
+        # time.sleep(2)
         while self.isRunning:
             try:
                 timestamp = int(time.time())
@@ -190,8 +190,6 @@ class GraphFrame(wx.Frame):
         # handle window close event
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
-        self.Maximize()
-
         # set data source
         self.source = UDPComs(self)
 
@@ -199,13 +197,13 @@ class GraphFrame(wx.Frame):
         for key in self.PLOT_KEYS:
             self.plots[key] = Plot()
 
-        self.panel = wx.Panel(self)
+        self.panel = wx.Panel(self, 1)
 
         self.init_plot()
         self.canvas = FigureCanvasWxAgg(self.panel, -1, self.fig)
 
         self.vbox = wx.BoxSizer(wx.VERTICAL)
-        self.vbox.Add(self.canvas, 1, flag=wx.LEFT | wx.TOP | wx.GROW)
+        self.vbox.Add(self.canvas, 1, flag=wx.EXPAND)
 
         self.panel.SetSizer(self.vbox)
         self.vbox.Fit(self)
@@ -215,7 +213,7 @@ class GraphFrame(wx.Frame):
         self.update_thread.start()
 
     def init_plot(self):
-        self.fig = Figure((6.0, 3.0), dpi=100)
+        self.fig = Figure()
         plot_rows = 4
         assert(plot_rows * NUMBER_OF_NODES == self.PLOT_COUNT)
         for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
@@ -266,7 +264,7 @@ class GraphFrame(wx.Frame):
 
     def update_plot_thread(self):
         while self.is_running:
-            self.draw_plot()
+            wx.CallAfter(self.draw_plot)
             time.sleep(2)
 
     def on_exit(self, event):
@@ -274,7 +272,6 @@ class GraphFrame(wx.Frame):
         self.is_running = False
         self.update_thread.join()
         self.Destroy()
-
 
 if __name__ == '__main__':
     app = wx.App(False)
