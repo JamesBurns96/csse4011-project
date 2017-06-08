@@ -94,11 +94,6 @@ print 'missed {0} of {2}\' packets. {1}%'. \
 
 valid_data = [data_james[i] for i in valid_indices]
 
-train_idx = [i for i in range(len(valid_data)) if random.uniform(0, 1) < 0.1]
-
-print 'valid samples: ', len(valid_data)
-print 'training samples: ', len(train_idx)
-
 X = [[x[3], x[4], x[5]] for x in valid_data]
 y = [x[9]/2. for x in valid_data]
 
@@ -119,5 +114,3 @@ for p in sorted(parameters):
 print_accuracy(clf, X_train, y_train, X_test, y_test)
 
 
-
-false_positives =
