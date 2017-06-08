@@ -31,6 +31,29 @@ firstPacketNumber = 0
 secondPacketNumber = 0
 
 
+class PedalTracker(object):
+    def __init__(self):
+        self.start_time = time.time()
+        self.time_at_last_rise = time.time()
+        self.last_times = collections.deque(maxlen=100)
+        self.risen = False
+        self.count = 0
+
+    def record_high(self):
+        self.time_at_last_rise = time.time()
+        if not self.risen:
+            self.count += 1
+        self.risen = True
+
+    def record_low(self):
+        t = time.time()
+        dt = (t - self.time_at_last_rise).milliseconds()/1000.
+        self.last_times.append(dt)
+        self.risen = False
+
+        return [np.mean(self.last_times), self.count/((t - self.start_time).milliseconds())]
+
+
 class UDPComs(object):
     """ The main frame of the application
     """
@@ -53,11 +76,13 @@ class UDPComs(object):
         # 0 = rigid body, 1 = accelerometer, 2 = brake, 3 = clutch
         # 4 = gear stick. 5 = steering wheel
 
+        self.trackers = []
         for i in range(NUMBER_OF_NODES):
             self.outputFiles.append(open(self.tagTypes[i] + '.csv', 'w+'))
             self.outputFiles[i].write("ID" + ',' + "timeStamp" + ',' + "packetNumber" + ',' + "sampleNumber" + ','
                                       + "accX" + ',' + "accY" + ',' + "accZ" + ','
                                       + "gyrX" + ',' + "gyrY" + ',' + "gyrZ" + '\n')
+            self.trackers.append(PedalTracker())
 
         self.pd = pedaldetect.PedalDetector()
         self.pd.train()
@@ -112,6 +137,7 @@ class UDPComs(object):
                         self.graph.update_data('t' + str(id[0]) + '-gyro-y', y)
                         self.graph.update_data('t' + str(id[0]) + '-gyro-z', z)
 
+                        pred =  None
                         if id[0] == 0:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
                             self.graph.update_data('t0-filt-x', pred)
@@ -133,6 +159,15 @@ class UDPComs(object):
                         if id[0] == 6:
                             pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
                             self.graph.update_data('t6-filt-x', pred)
+
+                        if pred is not None:
+                            if pred[0] < -0.5:
+                                self.trackers[id[0]].record_low()
+                            elif pred[0] > 0.5:
+                                [avg, rate] = self.trackers[id[0]].record_high()
+                                print "Average time on pedal {0}: {1}".format(id[0], avg)
+                                print "Pedal {0} rate: {1}".format(id[0], rate)
+
 
                 # wx.CallAfter(self.graph.draw_plot)
 
@@ -245,8 +280,6 @@ class GraphFrame(wx.Frame):
             xmax = len(self.plots[key].data) if len(self.plots[key].data) > 200 else 200
             xmin = xmax - 200
 
-            # ymin = round(min(self.plots[key].data), 0) - 1
-            # ymax = round(max(self.plots[key].data), 0) + 1
             ymin = -250
             ymax = 250
 
