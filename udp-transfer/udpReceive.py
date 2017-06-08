@@ -74,6 +74,7 @@ class UDPComs(object):
         print "Exit application by pressing (CTRL-C)"
 
     def udp_listen_thread(self):
+        time.sleep(1)
         while self.isRunning:
             try:
                 data, addr = self.sock.recvfrom(1024)
@@ -112,7 +113,27 @@ class UDPComs(object):
                         self.graph.update_data('t' + str(id[0]) + '-ay', y)
                         self.graph.update_data('t' + str(id[0]) + '-az', z)
 
-                        self.graph.update_data('t' + str(id[0]) + '-filtx', self.pd.predict(np.array([x, y, z]).reshape(1, -1)))
+                        if id[0] == 0:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t0-filtx', pred)
+                        if id[0] == 1:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t1-filtx', pred)
+                        if id[0] == 2:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t2-filtx', pred)
+                        if id[0] == 3:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t3-filtx', pred)
+                        if id[0] == 4:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -150, 150)
+                            self.graph.update_data('t4-filtx', pred)
+                        if id[0] == 5:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t5-filtx', pred)
+                        if id[0] == 6:
+                            pred = pedaldetect.predict_from_threshold([np.sum((x,y,z))], -50, 50)
+                            self.graph.update_data('t6-filtx', pred)
 
                 wx.CallAfter(self.graph.draw_plot)
 
@@ -121,6 +142,7 @@ class UDPComs(object):
                 continue
 
     def udp_send_thread(self):
+        time.sleep(2)
         while self.isRunning:
             timestamp = int(time.time())
             print "Sending timesync packet with UTC[s]:", timestamp, "Localtime:", time.strftime("%Y-%m-%d %H:%M:%S")
@@ -166,6 +188,8 @@ class GraphFrame(wx.Frame):
         # handle window close event
         self.Bind(wx.EVT_CLOSE, self.on_exit)
 
+        self.Maximize()
+
         # set data source
         self.source = UDPComs(self)
 
@@ -198,7 +222,7 @@ class GraphFrame(wx.Frame):
 
             # plot the data as a line series, and save the reference
             # to the plotted line series
-            self.plots[key].plot = self.plots[key].axes.plot(self.plots[key].data, linewidth=1, color=(1, 1, 0))[0]
+            self.plots[key].plot = self.plots[key].axes.plot(self.plots[key].data)[0]
 
     def update_data(self, key, val):
         self.plots[key].data.append(val)

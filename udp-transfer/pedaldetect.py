@@ -135,6 +135,19 @@ class PedalDetector(object):
         # return X
 
 
+def predict_from_threshold(X, t_low, t_high):
+    pred = []
+    for x in X:
+        if np.sum(x) > t_high:
+            pred.append(1)
+        elif np.sum(x) < t_low:
+            pred.append(-1)
+        else:
+            pred.append(0)
+
+    return pred
+
+
 if __name__ == '__main__':
     pd = PedalDetector()
     pd.train()
