@@ -151,7 +151,10 @@ class GraphFrame(wx.Frame):
     title = 'Demo'
     PLOT_KEYS = ['t0-ax', 't1-ax', 't2-ax', 't3-ax', 't4-ax', 't5-ax',
                  't0-ay', 't1-ay', 't2-ay', 't3-ay', 't4-ay', 't5-ay',
-                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az']
+                 't0-az', 't1-az', 't2-az', 't3-az', 't4-az', 't5-az',
+                 't0-filtx', 't1-filtx','t2-filtx', 'tilt3-filtx', 't4-filtx', 't5-filtx',
+                 't0-filty', 't1-filty','t2-filty', 'tilt3-filty', 't4-filty', 't5-filty',
+                 't0-filtz', 't1-filtz','t2-filtz', 'tilt3-filtz', 't4-filtz', 't5-filtz']
     PLOT_COUNT = len(PLOT_KEYS)
 
     def __init__(self):
@@ -180,8 +183,11 @@ class GraphFrame(wx.Frame):
 
     def init_plot(self):
         self.fig = Figure((6.0, 3.0), dpi=100)
+        plot_rows = 6
+        plot_cols = 6
+        assert(plot_rows * plot_cols == self.PLOT_COUNT)
         for (key, idx) in zip(self.PLOT_KEYS, range(self.PLOT_COUNT)):
-            self.plots[key].axes = self.fig.add_subplot(3, 6, idx+1)
+            self.plots[key].axes = self.fig.add_subplot(plot_rows, plot_cols, idx+1)
             self.plots[key].axes.set_facecolor('black')
             self.plots[key].axes.set_title(key, size=12)
 
