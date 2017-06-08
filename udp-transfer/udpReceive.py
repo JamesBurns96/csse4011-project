@@ -98,7 +98,7 @@ class UDPComs(object):
 
         self.dp = DriverPredict.DriverPredictor()
         self.dp.train()
-        self.last_drivers = collections.deque(maxlen=1000)
+        self.last_drivers = collections.deque(maxlen=100)
 
         self.trackers = []
         for i in range(NUMBER_OF_NODES):
