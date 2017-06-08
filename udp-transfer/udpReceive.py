@@ -194,11 +194,17 @@ class UDPComs(object):
 
                                 ml_x = [i, avg, rate, dt]
                                 y = self.dp.predict(ml_x)
+                                print y
+                                y = int(y[0])
                                 DRIVER_NAMES = ['James', 'Dan']
-                                driver_name = DRIVER_NAMES[y]
 
                                 self.last_drivers.append(y)
-                                confidence = 20 * np.abs(0.5 - np.mean(self.last_drivers))
+                                mn = np.mean(self.last_drivers)
+                                confidence = 200 * np.abs(0.5 - mn)
+                                if mn > 0.5:
+                                    driver_name = DRIVER_NAMES[1]
+                                else:
+                                    driver_name = DRIVER_NAMES[0]
 
                                 ServerInterface.update_server_driver(driver_name, confidence)
                                 print 'I THINK ', driver_name, ' IS DRIVING THE CAR ', confidence
