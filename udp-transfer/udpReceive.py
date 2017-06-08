@@ -32,13 +32,14 @@ secondPacketNumber = 0
 
 
 class PedalTracker(object):
-    def __init__(self):
+    def __init__(self, filename):
         self.start_time = time.time()
         self.time_at_last_rise = time.time()
         self.time_at_last_fall = time.time()
         self.last_times = collections.deque(maxlen=100)
         self.risen = False
         self.count = 0
+        self.file = open(filename, 'w')
 
     def record_high(self):
         t = time.time()
@@ -62,9 +63,13 @@ class PedalTracker(object):
         self.risen = False
 
         if len(self.last_times) == 0:
-            return [0, 0]
+            rv = [0, 0, 0]
         else:
-            return [np.mean(self.last_times), self.count/((self.time_at_last_fall - self.start_time)), dt]
+            rv = [np.mean(self.last_times), self.count/((self.time_at_last_fall - self.start_time)), dt]
+
+        self.file.write(",".join([str(x) for x in rv]) + "\n")
+
+        return rv
 
 
 class UDPComs(object):
@@ -95,7 +100,7 @@ class UDPComs(object):
             self.outputFiles[i].write("ID" + ',' + "timeStamp" + ',' + "packetNumber" + ',' + "sampleNumber" + ','
                                       + "accX" + ',' + "accY" + ',' + "accZ" + ','
                                       + "gyrX" + ',' + "gyrY" + ',' + "gyrZ" + '\n')
-            self.trackers.append(PedalTracker())
+            self.trackers.append(PedalTracker('pedaltracker-' + str(i) + '.csv'))
 
         self.pd = pedaldetect.PedalDetector()
         self.pd.train()
